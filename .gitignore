@@ -1,0 +1,21 @@
+# Dependencias de Node
+node_modules/
+
+# Archivos temporales, builds y caché de Expo
+.expo/
+dist/
+web-build/
+
+# Variables de entorno y claves secretas
+.env
+.env*.local
+.env.production
+
+# Archivos de registros y logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos del sistema operativo (macOS / Windows)
+.DS_Store
+Thumbs.db

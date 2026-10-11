@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "finnets-mobile",
+    "slug": "finnets-mobile",
+    "scheme": "finnets",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-web-browser"
+    ]
+  }
+}
