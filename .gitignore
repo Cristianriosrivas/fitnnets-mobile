@@ -19,3 +19,8 @@ yarn-error.log*
 # Archivos del sistema operativo (macOS / Windows)
 .DS_Store
 Thumbs.db
+# Builds nativos y binarios de Android/iOS (los genera EAS)
+android/
+ios/
+*.apk
+*.aab
