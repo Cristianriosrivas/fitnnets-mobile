@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, ScrollView, TextInput, Pressable } from 'react-native'
 import { Picker } from '@react-native-picker/picker'
 import { useRouter } from 'expo-router'
-import { Save, Check, ArrowLeft } from 'lucide-react-native'
+import { Save, Check, ArrowLeft, ShieldCheck, ChevronRight } from 'lucide-react-native'
 import { supabase } from '../../core/supabase/client'
 
 // IMPORTANTE: estos componentes van FUERA de PerfilScreen. Si se definen dentro,
@@ -234,6 +234,15 @@ export default function PerfilScreen() {
             <Text className="text-black font-semibold">{saving ? 'Guardando...' : 'Guardar cambios'}</Text>
           </>
         )}
+      </Pressable>
+
+      <Pressable
+        onPress={() => router.push('/(main)/privacidad')}
+        className="bg-surface border border-border rounded-xl px-4 py-3.5 mt-4 flex-row items-center gap-3"
+      >
+        <ShieldCheck color="#22c55e" size={18} />
+        <Text className="text-white font-medium flex-1">Privacidad y cuenta</Text>
+        <ChevronRight color="#6b7876" size={16} />
       </Pressable>
     </ScrollView>
   )

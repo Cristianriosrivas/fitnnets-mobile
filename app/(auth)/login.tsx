@@ -151,6 +151,12 @@ export default function LoginScreen() {
         >
           <Text className="text-white font-semibold">Continuar con Google</Text>
         </Pressable>
+
+        <Pressable onPress={() => router.replace('/(auth)/register')} className="mt-5 py-2 items-center">
+          <Text className="text-gray-400 text-sm">
+            No tienes cuenta? <Text className="text-primary font-semibold">Registrate</Text>
+          </Text>
+        </Pressable>
       </View>
     </View>
   )
