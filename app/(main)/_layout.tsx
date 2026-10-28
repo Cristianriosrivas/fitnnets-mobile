@@ -103,6 +103,7 @@ export default function MainLayout() {
       <Tabs.Screen name="retos" options={{ href: null }} />
       <Tabs.Screen name="rutinas-nueva" options={{ href: null }} />
       <Tabs.Screen name="perfil" options={{ href: null }} />
+      <Tabs.Screen name="entrenar/[id]" options={{ href: null }} />
     </Tabs>
   )
 }

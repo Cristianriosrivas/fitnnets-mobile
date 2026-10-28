@@ -153,6 +153,14 @@ export default function NuevaRutinaScreen() {
       return
     }
 
+    // Si falla un dia o un ejercicio, se borra la rutina recien creada (sus dias caen en cascada)
+    // para no dejar en la lista una rutina a medias sin ejercicios
+    const rollback = async (message: string) => {
+      await supabase.from('routines').delete().eq('id', routine.id)
+      setError(message)
+      setSaving(false)
+    }
+
     for (let i = 0; i < days.length; i++) {
       const day = days[i]
       const { data: routineDay, error: dayError } = await supabase
@@ -162,8 +170,7 @@ export default function NuevaRutinaScreen() {
         .single()
 
       if (dayError) {
-        setError(dayError.message)
-        setSaving(false)
+        await rollback(dayError.message)
         return
       }
 
@@ -179,8 +186,7 @@ export default function NuevaRutinaScreen() {
       const { error: exError } = await supabase.from('routine_exercises').insert(exercisesToInsert)
 
       if (exError) {
-        setError(exError.message)
-        setSaving(false)
+        await rollback(exError.message)
         return
       }
     }
