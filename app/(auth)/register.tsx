@@ -1,11 +1,14 @@
 import { useState } from 'react'
-import { View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, Pressable, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import * as WebBrowser from 'expo-web-browser'
-import * as Linking from 'expo-linking'
+import { User, Mail, Lock, Sparkles } from 'lucide-react-native'
 import { supabase } from '../../core/supabase/client'
 import { buildConsent } from '../../core/legal'
+import { signInWithGoogle } from '../../core/googleAuth'
 import ConsentChecks from '../../components/ConsentChecks'
+import AuthShell, { AuthField, GoogleButton, OrDivider } from '../../components/ui/AuthShell'
+import GradientButton from '../../components/ui/GradientButton'
+import { colors } from '../../components/ui/theme'
 
 // Mensajes de Supabase Auth traducidos; lo que no se reconoce cae en un texto generico
 function signUpErrorMessage(message: string) {
@@ -74,145 +77,69 @@ export default function RegisterScreen() {
 
   const handleGoogleLogin = async () => {
     setError('')
-
-    const redirectUrl = Linking.createURL('auth/callback')
-
-    const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-        skipBrowserRedirect: true,
-      },
-    })
-
-    if (oauthError || !data?.url) {
-      setError('No se pudo iniciar con Google')
-      return
-    }
-
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl)
-
-    if (result.type !== 'success' || !result.url) {
-      return
-    }
-
-    const resultUrl = result.url
-
-    if (resultUrl.includes('#')) {
-      const hash = resultUrl.split('#')[1]
-      const params = new URLSearchParams(hash)
-      const access_token = params.get('access_token')
-      const refresh_token = params.get('refresh_token')
-
-      if (access_token && refresh_token) {
-        await supabase.auth.setSession({ access_token, refresh_token })
-        router.replace('/(main)/(tabs)/dashboard')
-        return
-      }
-    }
-
-    const parsed = Linking.parse(resultUrl)
-    const code = parsed.queryParams?.code as string | undefined
-
-    if (code) {
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-      if (exchangeError) {
-        setError('No se pudo completar el inicio con Google')
-        return
-      }
-      router.replace('/(main)/(tabs)/dashboard')
-      return
-    }
-
-    setError('No se pudo completar el inicio con Google')
+    const result = await signInWithGoogle()
+    if (result === 'ok') router.replace('/(main)/(tabs)/dashboard')
+    else if (result === 'error') setError('No se pudo iniciar con Google')
   }
 
+  const ready = acceptTerms && acceptHealth
+
   return (
-    <KeyboardAvoidingView className="flex-1 bg-background" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 48 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View className="bg-surface border border-border rounded-2xl p-6">
-          <Text className="text-white text-xl font-bold text-center mb-1">
-            Crea tu cuenta
-          </Text>
-          <Text className="text-gray-400 text-sm text-center mb-6">
-            Tu mejor version empieza hoy.
-          </Text>
+    <AuthShell title="Crea tu cuenta" subtitle="Tu mejor version empieza hoy.">
+      <AuthField
+        label="Nombre de usuario"
+        icon={<User color={colors.muted} size={18} />}
+        value={username}
+        onChangeText={setUsername}
+        autoCapitalize="none"
+        placeholder="ej: carlos_fit"
+      />
+      <AuthField
+        label="Correo electronico"
+        icon={<Mail color={colors.muted} size={18} />}
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        placeholder="tu@email.com"
+      />
+      <AuthField
+        label="Contrasena"
+        icon={<Lock color={colors.muted} size={18} />}
+        value={password}
+        onChangeText={setPassword}
+        secret
+        placeholder="Minimo 6 caracteres"
+      />
 
-          <Text className="text-gray-400 text-sm mb-1">Nombre de usuario</Text>
-          <TextInput
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            placeholder="ej: carlos_fit"
-            placeholderTextColor="#6b7876"
-            className="bg-surface2 border border-border rounded-xl px-4 py-3 text-white mb-4"
-          />
+      <View className="mt-1">
+        <ConsentChecks
+          terms={acceptTerms}
+          health={acceptHealth}
+          onTermsChange={setAcceptTerms}
+          onHealthChange={setAcceptHealth}
+        />
+      </View>
 
-          <Text className="text-gray-400 text-sm mb-1">Correo electronico</Text>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder="tu@email.com"
-            placeholderTextColor="#6b7876"
-            className="bg-surface2 border border-border rounded-xl px-4 py-3 text-white mb-4"
-          />
+      {error ? <Text className="text-red-400 text-sm mb-3">{error}</Text> : null}
+      {info ? <Text className="text-primary text-sm mb-3">{info}</Text> : null}
 
-          <Text className="text-gray-400 text-sm mb-1">Contrasena</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="Minimo 6 caracteres"
-            placeholderTextColor="#6b7876"
-            className="bg-surface2 border border-border rounded-xl px-4 py-3 text-white mb-5"
-          />
+      <GradientButton
+        title={loading ? 'Creando cuenta...' : 'Registrarme'}
+        onPress={handleRegister}
+        loading={loading}
+        icon={<Sparkles color="#04120a" size={17} />}
+        style={{ marginTop: 6, opacity: ready ? 1 : 0.55 }}
+      />
 
-          <ConsentChecks
-            terms={acceptTerms}
-            health={acceptHealth}
-            onTermsChange={setAcceptTerms}
-            onHealthChange={setAcceptHealth}
-          />
+      <OrDivider />
+      <GoogleButton onPress={handleGoogleLogin} />
 
-          {error ? <Text className="text-red-400 text-sm mb-3">{error}</Text> : null}
-          {info ? <Text className="text-primary text-sm mb-3">{info}</Text> : null}
-
-          <Pressable
-            onPress={handleRegister}
-            disabled={loading}
-            className="bg-primary rounded-xl py-3 items-center mt-2"
-            style={{ opacity: loading || !acceptTerms || !acceptHealth ? 0.5 : 1 }}
-          >
-            <Text className="text-black font-semibold">
-              {loading ? 'Creando cuenta...' : 'Registrarme'}
-            </Text>
-          </Pressable>
-
-          <View className="flex-row items-center gap-3 my-5">
-            <View className="flex-1 h-px bg-border" />
-            <Text className="text-gray-500 text-xs">o</Text>
-            <View className="flex-1 h-px bg-border" />
-          </View>
-
-          <Pressable
-            onPress={handleGoogleLogin}
-            className="bg-surface2 border border-border rounded-xl py-3 items-center"
-          >
-            <Text className="text-white font-semibold">Continuar con Google</Text>
-          </Pressable>
-
-          <Pressable onPress={() => router.replace('/(auth)/login')} className="mt-5 py-2 items-center">
-            <Text className="text-gray-400 text-sm">
-              Ya tienes cuenta? <Text className="text-primary font-semibold">Inicia sesion</Text>
-            </Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <Pressable onPress={() => router.replace('/(auth)/login')} className="mt-5 py-2 items-center">
+        <Text className="text-gray-400 text-sm">
+          Ya tienes cuenta? <Text className="text-primary font-semibold">Inicia sesion</Text>
+        </Text>
+      </Pressable>
+    </AuthShell>
   )
 }

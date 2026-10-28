@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { View, Text, TextInput, Pressable } from 'react-native'
+import { Text, Pressable } from 'react-native'
 import { useRouter } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
-import * as Linking from 'expo-linking'
+import { Mail, Lock, ArrowRight } from 'lucide-react-native'
 import { supabase } from '../../core/supabase/client'
+import { signInWithGoogle } from '../../core/googleAuth'
+import AuthShell, { AuthField, GoogleButton, OrDivider } from '../../components/ui/AuthShell'
+import GradientButton from '../../components/ui/GradientButton'
+import { colors } from '../../components/ui/theme'
 
 export default function LoginScreen() {
   const router = useRouter()
@@ -32,60 +36,9 @@ export default function LoginScreen() {
 
   const handleGoogleLogin = async () => {
     setError('')
-
-    const redirectUrl = Linking.createURL('auth/callback')
-    console.log('Redirect URL generada (agregala a Supabase si falla):', redirectUrl)
-
-    const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-        skipBrowserRedirect: true,
-      },
-    })
-
-    if (oauthError || !data?.url) {
-      setError('No se pudo iniciar con Google')
-      return
-    }
-
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl)
-
-    if (result.type !== 'success' || !result.url) {
-      return
-    }
-
-    const resultUrl = result.url
-
-    // Caso 1: Supabase devuelve tokens en el fragmento (#access_token=...)
-    if (resultUrl.includes('#')) {
-      const hash = resultUrl.split('#')[1]
-      const params = new URLSearchParams(hash)
-      const access_token = params.get('access_token')
-      const refresh_token = params.get('refresh_token')
-
-      if (access_token && refresh_token) {
-        await supabase.auth.setSession({ access_token, refresh_token })
-        router.replace('/(main)/(tabs)/dashboard')
-        return
-      }
-    }
-
-    // Caso 2: Supabase devuelve un codigo en query (?code=...)
-    const parsed = Linking.parse(resultUrl)
-    const code = parsed.queryParams?.code as string | undefined
-
-    if (code) {
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-      if (exchangeError) {
-        setError('No se pudo completar el inicio con Google')
-        return
-      }
-      router.replace('/(main)/(tabs)/dashboard')
-      return
-    }
-
-    setError('No se pudo completar el inicio con Google')
+    const result = await signInWithGoogle()
+    if (result === 'ok') router.replace('/(main)/(tabs)/dashboard')
+    else if (result === 'error') setError('No se pudo completar el inicio con Google')
   }
 
   const handleForgotPassword = async () => {
@@ -93,71 +46,46 @@ export default function LoginScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background justify-center px-6">
-      <View className="bg-surface border border-border rounded-2xl p-6">
-        <Text className="text-white text-xl font-bold text-center mb-1">
-          Bienvenido de nuevo
+    <AuthShell title="Bienvenido de nuevo" subtitle="Disciplina hoy, resultados manana.">
+      <AuthField
+        label="Correo electronico"
+        icon={<Mail color={colors.muted} size={18} />}
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        placeholder="tu@email.com"
+      />
+      <AuthField
+        label="Contrasena"
+        icon={<Lock color={colors.muted} size={18} />}
+        value={password}
+        onChangeText={setPassword}
+        secret
+        placeholder="********"
+      />
+
+      <Pressable onPress={handleForgotPassword} className="self-end mb-5 -mt-1 py-1">
+        <Text className="text-primary text-xs font-semibold">Olvidaste tu contrasena?</Text>
+      </Pressable>
+
+      {error ? <Text className="text-red-400 text-sm mb-3">{error}</Text> : null}
+
+      <GradientButton
+        title={loading ? 'Ingresando...' : 'Iniciar sesion'}
+        onPress={handleLogin}
+        loading={loading}
+        icon={<ArrowRight color="#04120a" size={18} />}
+      />
+
+      <OrDivider />
+      <GoogleButton onPress={handleGoogleLogin} />
+
+      <Pressable onPress={() => router.replace('/(auth)/register')} className="mt-5 py-2 items-center">
+        <Text className="text-gray-400 text-sm">
+          No tienes cuenta? <Text className="text-primary font-semibold">Registrate</Text>
         </Text>
-        <Text className="text-gray-400 text-sm text-center mb-6">
-          Disciplina hoy, resultados manana.
-        </Text>
-
-        <Text className="text-gray-400 text-sm mb-1">Correo electronico</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="tu@email.com"
-          placeholderTextColor="#6b7876"
-          className="bg-surface2 border border-border rounded-xl px-4 py-3 text-white mb-4"
-        />
-
-        <Text className="text-gray-400 text-sm mb-1">Contrasena</Text>
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="********"
-          placeholderTextColor="#6b7876"
-          className="bg-surface2 border border-border rounded-xl px-4 py-3 text-white mb-2"
-        />
-
-        <Pressable onPress={handleForgotPassword} className="self-end mb-4">
-          <Text className="text-primary text-xs">Olvidaste tu contrasena?</Text>
-        </Pressable>
-
-        {error ? <Text className="text-red-400 text-sm mb-3">{error}</Text> : null}
-
-        <Pressable
-          onPress={handleLogin}
-          disabled={loading}
-          className="bg-primary rounded-xl py-3 items-center"
-        >
-          <Text className="text-black font-semibold">
-            {loading ? 'Ingresando...' : 'Iniciar sesion'}
-          </Text>
-        </Pressable>
-
-        <View className="flex-row items-center gap-3 my-5">
-          <View className="flex-1 h-px bg-border" />
-          <Text className="text-gray-500 text-xs">o</Text>
-          <View className="flex-1 h-px bg-border" />
-        </View>
-
-        <Pressable
-          onPress={handleGoogleLogin}
-          className="bg-surface2 border border-border rounded-xl py-3 items-center"
-        >
-          <Text className="text-white font-semibold">Continuar con Google</Text>
-        </Pressable>
-
-        <Pressable onPress={() => router.replace('/(auth)/register')} className="mt-5 py-2 items-center">
-          <Text className="text-gray-400 text-sm">
-            No tienes cuenta? <Text className="text-primary font-semibold">Registrate</Text>
-          </Text>
-        </Pressable>
-      </View>
-    </View>
+      </Pressable>
+    </AuthShell>
   )
 }

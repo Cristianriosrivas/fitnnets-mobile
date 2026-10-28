@@ -1,9 +1,19 @@
-import { useState, useCallback } from 'react'
-import { View, Text, ScrollView, RefreshControl, Pressable } from 'react-native'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { View, Text, ScrollView, RefreshControl, Animated } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import Svg, { Circle } from 'react-native-svg'
-import { Weight, Ruler, Dumbbell, Flame, Play, Droplet, Trophy, ChevronRight } from 'lucide-react-native'
+import { Weight, Ruler, Dumbbell, Flame, Play, Droplet, Trophy, ChevronRight, Plus } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
+import Aurora from '../../../components/ui/Aurora'
+import FadeIn from '../../../components/ui/FadeIn'
+import TiltCard from '../../../components/ui/TiltCard'
+import PressableScale from '../../../components/ui/PressableScale'
+import GradientFill from '../../../components/ui/GradientFill'
+import IconBadge from '../../../components/ui/IconBadge'
+import AnimatedRing from '../../../components/ui/AnimatedRing'
+import CountUp from '../../../components/ui/CountUp'
+import Skeleton from '../../../components/ui/Skeleton'
+import { colors, glow, gradients, GradientColors } from '../../../components/ui/theme'
 
 const TIPS = [
   'Mantén una buena hidratación. El agua mejora tu rendimiento y recuperación.',
@@ -16,13 +26,86 @@ const TIPS = [
 ]
 
 const DAY_LABELS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
-const RING_RADIUS = 42
-const RING_LENGTH = 2 * Math.PI * RING_RADIUS
 
-// La altura debe guardarse en cm (ej: 181). Si algun dato viejo quedo en metros (ej: 1.81), se muestra bien igual.
-function formatHeight(value: number | null) {
-  if (!value) return '--'
-  return value > 3 ? `${value} cm` : `${value} m`
+function greeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Buenos días'
+  if (hour < 19) return 'Buenas tardes'
+  return 'Buenas noches'
+}
+
+type StatProps = {
+  icon: React.ReactNode
+  colors: GradientColors
+  label: string
+  children: React.ReactNode
+}
+
+function StatCard({ icon, colors: gradient, label, children }: StatProps) {
+  return (
+    <TiltCard maxTilt={12} style={{ width: '100%' }} radius={22}>
+      <View className="bg-surface border border-border rounded-[22px] p-4">
+        <IconBadge colors={gradient} size={34} radius={11}>
+          {icon}
+        </IconBadge>
+        <Text className="text-gray-400 text-xs mt-3">{label}</Text>
+        <View className="flex-row items-end mt-0.5">{children}</View>
+      </View>
+    </TiltCard>
+  )
+}
+
+// Barras de la semana que crecen con rebote, una tras otra
+function WeekBars({ days }: { days: { label: string; trained: boolean }[] }) {
+  const grow = useRef(days.map(() => new Animated.Value(0))).current
+
+  useEffect(() => {
+    Animated.stagger(
+      70,
+      grow.map((value) => Animated.spring(value, { toValue: 1, useNativeDriver: true, speed: 9, bounciness: 9 }))
+    ).start()
+  }, [grow])
+
+  return (
+    <View className="flex-1 flex-row items-end justify-between ml-5" style={{ height: 92 }}>
+      {days.map((d, i) => (
+        <View key={i} className="items-center flex-1">
+          <View style={{ height: 66, width: '100%', justifyContent: 'flex-end', paddingHorizontal: 4 }}>
+            <Animated.View
+              style={{
+                height: d.trained ? 66 : 14,
+                borderRadius: 999,
+                overflow: 'hidden',
+                backgroundColor: d.trained ? undefined : '#1f2926',
+                transformOrigin: 'bottom',
+                transform: [{ scaleY: grow[i] }],
+              }}
+            >
+              {d.trained ? <GradientFill colors={['#a3e635', '#22c55e', '#15803d']} direction="vertical" /> : null}
+            </Animated.View>
+          </View>
+          <Text style={{ fontSize: 10, color: i === days.length - 1 ? colors.primary : colors.muted, marginTop: 6, fontWeight: i === days.length - 1 ? '700' : '500' }}>
+            {d.label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  )
+}
+
+function DashboardSkeleton() {
+  return (
+    <View className="flex-1 bg-background" style={{ paddingHorizontal: 16, paddingTop: 64 }}>
+      <Skeleton height={18} width={120} radius={8} />
+      <Skeleton height={34} width={200} radius={10} style={{ marginTop: 10 }} />
+      <Skeleton height={190} radius={28} style={{ marginTop: 26 }} />
+      <View className="flex-row justify-between mt-4">
+        <Skeleton height={118} width="48.5%" radius={22} />
+        <Skeleton height={118} width="48.5%" radius={22} />
+      </View>
+      <Skeleton height={150} radius={24} style={{ marginTop: 14 }} />
+    </View>
+  )
 }
 
 export default function DashboardScreen() {
@@ -131,183 +214,199 @@ export default function DashboardScreen() {
     setRefreshing(false)
   }
 
-  const weekPercent = Math.round((last7.filter((d) => d.trained).length / 7) * 100)
+  const trainedDays = last7.filter((d) => d.trained).length
+  const weekPercent = Math.round((trainedDays / 7) * 100)
   const tipOfDay = TIPS[new Date().getDate() % TIPS.length]
 
-  if (loading) {
-    return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <Text className="text-gray-400">Cargando...</Text>
-      </View>
-    )
-  }
+  if (loading) return <DashboardSkeleton />
 
   return (
     <ScrollView
       className="flex-1 bg-background"
       contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: 30 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22c55e" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
+      <Aurora height={480} style={{ top: -60, left: -16, right: -16 }} />
+
       {/* Encabezado: el avatar abre el perfil */}
-      <View className="flex-row items-center justify-between mb-6">
-        <View className="flex-1 pr-3">
-          <Text className="text-white text-2xl font-bold">¡Hola, {username || 'atleta'}! 👋</Text>
-          <Text className="text-gray-400 text-sm mt-1">Tu progreso es el resultado de tus hábitos.</Text>
+      <FadeIn>
+        <View className="flex-row items-center justify-between mb-6">
+          <View className="flex-1 pr-3">
+            <Text className="text-primary text-xs font-bold uppercase" style={{ letterSpacing: 2 }}>
+              {greeting()}
+            </Text>
+            <Text className="text-white text-3xl font-extrabold mt-1" numberOfLines={1}>
+              {(username || 'Atleta') + ' 👋'}
+            </Text>
+            <Text className="text-gray-400 text-sm mt-1">Tu progreso es el resultado de tus hábitos.</Text>
+          </View>
+          <PressableScale onPress={() => router.push('/(main)/perfil')} accessibilityLabel="Editar perfil">
+            <View style={[{ width: 52, height: 52, borderRadius: 26, padding: 2.5 }, glow(colors.primary, 14, 0.5)]}>
+              <View style={{ flex: 1, borderRadius: 26, overflow: 'hidden' }}>
+                <GradientFill colors={gradients.brand} radius={26} />
+                <View className="flex-1 m-[2.5px] rounded-full bg-background items-center justify-center">
+                  <Text className="text-primary font-extrabold text-lg">{username?.[0]?.toUpperCase() || 'U'}</Text>
+                </View>
+              </View>
+            </View>
+          </PressableScale>
         </View>
-        <Pressable
-          onPress={() => router.push('/(main)/perfil')}
-          accessibilityLabel="Editar perfil"
-          className="w-11 h-11 rounded-full bg-green-500/15 items-center justify-center"
+      </FadeIn>
+
+      {/* Tu rutina de hoy: tarjeta 3D flotante */}
+      <FadeIn delay={90}>
+        <TiltCard
+          float
+          glare
+          radius={28}
+          maxTilt={7}
+          onPress={() => router.push(latestRoutine ? `/(main)/entrenar/${latestRoutine.id}` : '/(main)/(tabs)/rutinas')}
+          accessibilityLabel={latestRoutine ? 'Iniciar ' + latestRoutine.dayTitle : 'Crear rutina'}
+          style={[{ marginBottom: 16 }, glow(colors.primary, 26, 0.35)]}
         >
-          <Text className="text-primary font-bold text-base">{username?.[0]?.toUpperCase() || 'U'}</Text>
-        </Pressable>
-      </View>
+          <View style={{ borderRadius: 28, overflow: 'hidden', padding: 22, minHeight: 190 }}>
+            <GradientFill colors={['#16a34a', '#047857', '#022c22']} radius={28} />
+            {/* Anillos decorativos */}
+            <Svg width={220} height={220} style={{ position: 'absolute', right: -70, top: -50 }} pointerEvents="none">
+              <Circle cx={110} cy={110} r={100} stroke="rgba(255,255,255,0.10)" strokeWidth={2} fill="none" />
+              <Circle cx={110} cy={110} r={72} stroke="rgba(255,255,255,0.08)" strokeWidth={2} fill="none" />
+              <Circle cx={110} cy={110} r={44} stroke="rgba(255,255,255,0.06)" strokeWidth={2} fill="none" />
+            </Svg>
+            <View style={{ position: 'absolute', right: 18, bottom: 14, opacity: 0.12 }} pointerEvents="none">
+              <Dumbbell color="#ffffff" size={96} />
+            </View>
 
-      {/* Estadisticas */}
+            <Text className="text-white/70 text-[11px] font-bold uppercase" style={{ letterSpacing: 2 }}>
+              Tu rutina de hoy
+            </Text>
+            {latestRoutine ? (
+              <>
+                <Text className="text-white text-2xl font-extrabold mt-2" numberOfLines={2}>
+                  {latestRoutine.dayTitle}
+                </Text>
+                <View className="flex-row items-center gap-2 mt-2">
+                  <View className="bg-white/15 rounded-full px-2.5 py-1">
+                    <Text className="text-white text-xs font-semibold">{latestRoutine.exerciseCount + ' ejercicios'}</Text>
+                  </View>
+                  <Text className="text-white/70 text-xs flex-1" numberOfLines={1}>
+                    {latestRoutine.title}
+                  </Text>
+                </View>
+                <View className="flex-row items-center self-start bg-white rounded-full pl-3 pr-4 py-2.5 mt-5 gap-2">
+                  <View className="bg-primary rounded-full p-1">
+                    <Play color="#04120a" size={12} fill="#04120a" />
+                  </View>
+                  <Text className="text-black font-bold text-sm">Iniciar rutina</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text className="text-white text-2xl font-extrabold mt-2">Aún no tienes una rutina</Text>
+                <Text className="text-white/70 text-sm mt-1">Genera una con IA o créala a tu medida.</Text>
+                <View className="flex-row items-center self-start bg-white rounded-full pl-3 pr-4 py-2.5 mt-5 gap-2">
+                  <Plus color="#04120a" size={16} />
+                  <Text className="text-black font-bold text-sm">Crear rutina</Text>
+                </View>
+              </>
+            )}
+          </View>
+        </TiltCard>
+      </FadeIn>
+
+      {/* Estadisticas en tarjetas 3D */}
       <View className="flex-row flex-wrap justify-between">
-        <StatCard
-          icon={<Weight color="#22c55e" size={14} />}
-          label="Peso actual"
-          value={weightKg ? `${weightKg} kg` : '-- kg'}
-        />
-        <StatCard
-          icon={<Ruler color="#22c55e" size={14} />}
-          label="Altura"
-          value={formatHeight(heightCm)}
-        />
-        <StatCard
-          icon={<Dumbbell color="#22c55e" size={14} />}
-          label="Brazo"
-          value={bicepCm ? `${bicepCm} cm` : '-- cm'}
-        />
-        <StatCard
-          icon={<Flame color="#fb923c" size={14} />}
-          label="Racha actual"
-          value={`${streak} día${streak !== 1 ? 's' : ''}`}
-        />
-      </View>
-
-      {/* Tu rutina de hoy */}
-      <View className="bg-surface border border-border rounded-2xl p-5 mb-4">
-        <Text className="text-gray-400 text-xs mb-1">Tu rutina de hoy</Text>
-        {latestRoutine ? (
-          <>
-            <Text className="text-white font-semibold text-base">{latestRoutine.dayTitle}</Text>
-            <Text className="text-gray-400 text-xs mt-1">{latestRoutine.exerciseCount} ejercicios</Text>
-            <Pressable
-              onPress={() => router.push(`/(main)/entrenar/${latestRoutine.id}`)}
-              className="bg-primary rounded-xl py-3 mt-4 flex-row items-center justify-center gap-2"
-            >
-              <Play color="black" size={16} />
-              <Text className="text-black font-semibold">Iniciar rutina</Text>
-            </Pressable>
-          </>
-        ) : (
-          <>
-            <Text className="text-white font-semibold text-base">Aún no tienes una rutina</Text>
-            <Pressable
-              onPress={() => router.push('/(main)/(tabs)/rutinas')}
-              className="bg-primary rounded-xl py-3 mt-4 items-center"
-            >
-              <Text className="text-black font-semibold">Crear rutina</Text>
-            </Pressable>
-          </>
-        )}
+        <FadeIn delay={170} style={{ width: '48.5%', marginBottom: 12 }}>
+          <StatCard icon={<Weight color="#04120a" size={17} />} colors={gradients.brand} label="Peso actual">
+            {weightKg ? (
+              <>
+                <CountUp value={Number(weightKg)} decimals={Number.isInteger(Number(weightKg)) ? 0 : 1} className="text-white text-2xl font-extrabold" />
+                <Text className="text-gray-400 text-xs mb-1 ml-1">kg</Text>
+              </>
+            ) : (
+              <Text className="text-white text-2xl font-extrabold">--</Text>
+            )}
+          </StatCard>
+        </FadeIn>
+        <FadeIn delay={230} style={{ width: '48.5%', marginBottom: 12 }}>
+          <StatCard icon={<Ruler color="#04120a" size={17} />} colors={gradients.ocean} label="Altura">
+            {/* La altura debe guardarse en cm (ej: 181). Si algun dato viejo quedo en metros (ej: 1.81), se muestra bien igual. */}
+            {heightCm ? (
+              <>
+                <CountUp value={Number(heightCm)} decimals={heightCm > 3 ? 0 : 2} className="text-white text-2xl font-extrabold" />
+                <Text className="text-gray-400 text-xs mb-1 ml-1">{heightCm > 3 ? 'cm' : 'm'}</Text>
+              </>
+            ) : (
+              <Text className="text-white text-2xl font-extrabold">--</Text>
+            )}
+          </StatCard>
+        </FadeIn>
+        <FadeIn delay={290} style={{ width: '48.5%', marginBottom: 12 }}>
+          <StatCard icon={<Dumbbell color="#ffffff" size={17} />} colors={gradients.violet} label="Brazo">
+            {bicepCm ? (
+              <>
+                <CountUp value={Number(bicepCm)} decimals={Number.isInteger(Number(bicepCm)) ? 0 : 1} className="text-white text-2xl font-extrabold" />
+                <Text className="text-gray-400 text-xs mb-1 ml-1">cm</Text>
+              </>
+            ) : (
+              <Text className="text-white text-2xl font-extrabold">--</Text>
+            )}
+          </StatCard>
+        </FadeIn>
+        <FadeIn delay={350} style={{ width: '48.5%', marginBottom: 12 }}>
+          <StatCard icon={<Flame color="#ffffff" size={17} />} colors={gradients.ember} label="Racha actual">
+            <CountUp value={streak} className="text-white text-2xl font-extrabold" />
+            <Text className="text-gray-400 text-xs mb-1 ml-1">{streak === 1 ? 'día' : 'días'}</Text>
+          </StatCard>
+        </FadeIn>
       </View>
 
       {/* Progreso semanal */}
-      <View className="bg-surface border border-border rounded-2xl p-5 mb-4">
-        <Text className="text-white font-semibold text-sm mb-4">Progreso semanal</Text>
-        <View className="flex-row items-center">
-          <View style={{ width: 96, height: 96 }}>
-            <Svg width={96} height={96} viewBox="0 0 100 100">
-              <Circle cx="50" cy="50" r={RING_RADIUS} fill="none" stroke="#1f2926" strokeWidth={10} />
-              <Circle
-                cx="50"
-                cy="50"
-                r={RING_RADIUS}
-                fill="none"
-                stroke="#22c55e"
-                strokeWidth={10}
-                strokeDasharray={RING_LENGTH}
-                strokeDashoffset={RING_LENGTH * (1 - weekPercent / 100)}
-                strokeLinecap="round"
-                rotation="-90"
-                origin="50, 50"
-              />
-            </Svg>
-            <View
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text className="text-white text-lg font-bold">{weekPercent}%</Text>
-              <Text style={{ fontSize: 9, color: '#9ca8a5' }}>Completado</Text>
+      <FadeIn delay={420}>
+        <View className="bg-surface border border-border rounded-3xl p-5 mb-4">
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-white font-bold text-base">Progreso semanal</Text>
+            <View className="bg-green-500/15 rounded-full px-2.5 py-1">
+              <Text className="text-primary text-xs font-bold">{trainedDays + '/7 días'}</Text>
             </View>
           </View>
-
-          <View className="flex-1 flex-row items-end justify-between ml-6" style={{ height: 80 }}>
-            {last7.map((d, i) => (
-              <View key={i} className="items-center flex-1">
-                <View style={{ height: 56, width: '100%', justifyContent: 'flex-end', paddingHorizontal: 3 }}>
-                  <View
-                    style={{
-                      height: d.trained ? 56 : 11,
-                      borderRadius: 999,
-                      backgroundColor: d.trained ? '#22c55e' : '#1f2926',
-                    }}
-                  />
-                </View>
-                <Text style={{ fontSize: 10, color: '#6b7876', marginTop: 6 }}>{d.label}</Text>
-              </View>
-            ))}
+          <View className="flex-row items-center">
+            <AnimatedRing progress={weekPercent} size={104} stroke={11} delay={300}>
+              <CountUp value={weekPercent} suffix="%" delay={300} className="text-white text-xl font-extrabold" />
+              <Text style={{ fontSize: 9, color: colors.soft }}>completado</Text>
+            </AnimatedRing>
+            <WeekBars days={last7} />
           </View>
         </View>
-      </View>
+      </FadeIn>
 
       {/* Logros */}
-      <Pressable
-        onPress={() => router.push('/(main)/logros')}
-        className="bg-surface border border-border rounded-2xl p-4 mb-4 flex-row items-center gap-3"
-      >
-        <View className="bg-yellow-500/15 rounded-lg p-2">
-          <Trophy color="#facc15" size={18} />
-        </View>
-        <View className="flex-1">
-          <Text className="text-white font-semibold text-sm">Logros e insignias</Text>
-          <Text className="text-gray-400 text-xs mt-0.5">Mira lo que has desbloqueado y lo que te falta</Text>
-        </View>
-        <ChevronRight color="#6b7876" size={16} />
-      </Pressable>
+      <FadeIn delay={490}>
+        <PressableScale onPress={() => router.push('/(main)/logros')} accessibilityLabel="Ver logros e insignias">
+          <View className="bg-surface border border-border rounded-3xl p-4 mb-4 flex-row items-center gap-3">
+            <IconBadge colors={gradients.gold} size={42} radius={14}>
+              <Trophy color="#422006" size={20} />
+            </IconBadge>
+            <View className="flex-1">
+              <Text className="text-white font-bold text-sm">Logros e insignias</Text>
+              <Text className="text-gray-400 text-xs mt-0.5">Mira lo que has desbloqueado y lo que te falta</Text>
+            </View>
+            <ChevronRight color={colors.muted} size={18} />
+          </View>
+        </PressableScale>
+      </FadeIn>
 
       {/* Consejo del dia */}
-      <View className="bg-surface border border-border rounded-2xl p-5">
-        <Text className="text-white font-semibold text-sm mb-3">Consejo del día</Text>
-        <View className="flex-row items-start gap-3">
-          <View className="bg-blue-500/15 rounded-lg p-2">
-            <Droplet color="#60a5fa" size={18} />
+      <FadeIn delay={560}>
+        <View className="bg-surface border border-border rounded-3xl p-5">
+          <View className="flex-row items-center gap-3 mb-3">
+            <IconBadge colors={gradients.ocean} size={34} radius={11}>
+              <Droplet color="#04120a" size={16} />
+            </IconBadge>
+            <Text className="text-white font-bold text-sm">Consejo del día</Text>
           </View>
-          <Text className="flex-1 text-gray-400 text-sm leading-5">{tipOfDay}</Text>
+          <Text className="text-gray-400 text-sm leading-5">{tipOfDay}</Text>
         </View>
-      </View>
+      </FadeIn>
     </ScrollView>
-  )
-}
-
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <View className="bg-surface border border-border rounded-2xl p-4 mb-3" style={{ width: '48.5%' }}>
-      <View className="flex-row items-center gap-1.5 mb-1">
-        {icon}
-        <Text className="text-gray-400 text-xs">{label}</Text>
-      </View>
-      <Text className="text-white text-xl font-bold">{value}</Text>
-    </View>
   )
 }

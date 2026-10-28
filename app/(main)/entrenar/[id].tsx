@@ -1,9 +1,19 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, Pressable, Image, ScrollView } from 'react-native'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { View, Text, Pressable, Image, ScrollView, Animated, Easing } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { CheckCircle2, X, SkipForward } from 'lucide-react-native'
+import { X, SkipForward, ArrowLeft, Play, Check, Dumbbell, Trophy, Repeat, Layers } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
 import { checkNewBadges } from '../../../core/appChecks'
+import FadeIn from '../../../components/ui/FadeIn'
+import PressableScale from '../../../components/ui/PressableScale'
+import GradientButton from '../../../components/ui/GradientButton'
+import GradientFill from '../../../components/ui/GradientFill'
+import IconBadge from '../../../components/ui/IconBadge'
+import AnimatedRing from '../../../components/ui/AnimatedRing'
+import Confetti from '../../../components/ui/Confetti'
+import Skeleton from '../../../components/ui/Skeleton'
+import { GlowOrb } from '../../../components/ui/Aurora'
+import { colors, glow, gradients } from '../../../components/ui/theme'
 
 type FlatExercise = {
   id: string
@@ -13,6 +23,82 @@ type FlatExercise = {
   sets: number
   reps: string
   rest_seconds: number
+}
+
+const DAY_GRADIENTS = [gradients.brand, gradients.ocean, gradients.violet, gradients.ember, gradients.gold]
+
+// Barra superior que avanza con cada ejercicio
+function ProgressBar({ value }: { value: number }) {
+  const progress = useRef(new Animated.Value(value)).current
+  useEffect(() => {
+    Animated.timing(progress, { toValue: value, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
+  }, [value, progress])
+  return (
+    <View className="h-2 rounded-full bg-surface2 overflow-hidden flex-1 mx-3">
+      <Animated.View style={{ flex: 1, borderRadius: 999, overflow: 'hidden', transformOrigin: 'left', transform: [{ scaleX: progress }] }}>
+        <GradientFill colors={gradients.brand} direction="horizontal" />
+      </Animated.View>
+    </View>
+  )
+}
+
+// Puntos de las series: hechas en verde, la actual late, las que faltan en gris
+function SetDots({ total, current }: { total: number; current: number }) {
+  const pulse = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 650, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 650, useNativeDriver: true }),
+      ])
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [pulse])
+  return (
+    <View className="flex-row gap-2 mt-4">
+      {Array.from({ length: total }, (_, i) => {
+        const n = i + 1
+        if (n === current) {
+          return (
+            <Animated.View
+              key={n}
+              style={{
+                flex: 1,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: colors.primary,
+                opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }),
+              }}
+            />
+          )
+        }
+        return <View key={n} style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: n < current ? colors.primary : colors.surface2 }} />
+      })}
+    </View>
+  )
+}
+
+// Trofeo que entra con rebote al terminar
+function CelebrationTrophy() {
+  const pop = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 6, bounciness: 14 }).start()
+  }, [pop])
+  return (
+    <Animated.View
+      style={{
+        transform: [
+          { scale: pop },
+          { rotate: pop.interpolate({ inputRange: [0, 1], outputRange: ['-25deg', '0deg'] }) },
+        ],
+      }}
+    >
+      <IconBadge colors={gradients.gold} size={110} radius={36}>
+        <Trophy color="#422006" size={54} strokeWidth={2.2} />
+      </IconBadge>
+    </Animated.View>
+  )
 }
 
 export default function EntrenarScreen() {
@@ -28,6 +114,7 @@ export default function EntrenarScreen() {
   const [currentSet, setCurrentSet] = useState(1)
   const [phase, setPhase] = useState<'exercise' | 'resting' | 'done'>('exercise')
   const [secondsLeft, setSecondsLeft] = useState(0)
+  const [restRound, setRestRound] = useState(0)
 
   useEffect(() => {
     const load = async () => {
@@ -108,99 +195,171 @@ export default function EntrenarScreen() {
   const handleCompleteSet = () => {
     if (!currentExercise) return
     setSecondsLeft(currentExercise.rest_seconds)
+    setRestRound((r) => r + 1)
     setPhase('resting')
   }
 
   if (loading) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <Text className="text-gray-400">Cargando rutina...</Text>
+      <View className="flex-1 bg-background px-4" style={{ paddingTop: 64 }}>
+        <Skeleton height={28} width={220} radius={10} />
+        <Skeleton height={86} radius={22} style={{ marginTop: 24 }} />
+        <Skeleton height={86} radius={22} style={{ marginTop: 12 }} />
+        <Skeleton height={86} radius={22} style={{ marginTop: 12 }} />
       </View>
     )
   }
 
+  // ----- Elegir el dia -----
   if (!selectedDay) {
     return (
-      <View className="flex-1 bg-background px-4 pt-16">
-        <Text className="text-white text-xl font-bold mb-1">¿Qué día vas a entrenar?</Text>
-        <Text className="text-gray-400 text-sm mb-6">Elige el día de tu rutina</Text>
-        {days.map((day) => (
-          <Pressable
-            key={day.id}
-            onPress={() => startDay(day)}
-            className="bg-surface border border-border rounded-xl p-4 mb-3"
-          >
-            <Text className="text-white font-semibold">{day.title}</Text>
-            <Text className="text-gray-400 text-xs">{day.routine_exercises?.length || 0} ejercicios</Text>
-          </Pressable>
+      <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 16, paddingTop: 60, paddingBottom: 40 }}>
+        <Pressable onPress={() => router.back()} accessibilityLabel="Volver" hitSlop={12} className="mb-5 self-start">
+          <ArrowLeft color={colors.soft} size={22} />
+        </Pressable>
+        <FadeIn>
+          <Text className="text-primary text-xs font-bold uppercase" style={{ letterSpacing: 2 }}>
+            Hora de entrenar
+          </Text>
+          <Text className="text-white text-3xl font-extrabold mt-1">¿Qué día vas a entrenar?</Text>
+          <Text className="text-gray-400 text-sm mt-1 mb-6">Elige el día de tu rutina</Text>
+        </FadeIn>
+        {days.length === 0 ? (
+          <Text className="text-gray-400 text-center mt-10">Esta rutina todavía no tiene días.</Text>
+        ) : null}
+        {days.map((day, i) => (
+          <FadeIn key={day.id} delay={80 + i * 70}>
+            <PressableScale onPress={() => startDay(day)} accessibilityLabel={'Entrenar ' + day.title}>
+              <View className="bg-surface border border-border rounded-3xl p-4 mb-3 flex-row items-center gap-4">
+                <IconBadge colors={DAY_GRADIENTS[i % DAY_GRADIENTS.length]} size={48} radius={16}>
+                  <Text style={{ color: '#04120a', fontWeight: '900', fontSize: 18 }}>{i + 1}</Text>
+                </IconBadge>
+                <View className="flex-1">
+                  <Text className="text-white font-bold text-base">{day.title}</Text>
+                  <Text className="text-gray-400 text-xs mt-0.5">{(day.routine_exercises?.length || 0) + ' ejercicios'}</Text>
+                </View>
+                <View className="bg-primary rounded-full p-2.5" style={glow(colors.primary, 10, 0.5)}>
+                  <Play color="#04120a" size={14} fill="#04120a" />
+                </View>
+              </View>
+            </PressableScale>
+          </FadeIn>
         ))}
-      </View>
+      </ScrollView>
     )
   }
 
+  // ----- Terminado -----
   if (phase === 'done') {
+    const totalSets = queue.reduce((sum, ex) => sum + ex.sets, 0)
     return (
       <View className="flex-1 bg-background items-center justify-center px-6">
-        <CheckCircle2 color="#22c55e" size={56} />
-        <Text className="text-white text-2xl font-bold mt-4 text-center">
-          ¡Entrenamiento completado! 🎉
-        </Text>
-        <Text className="text-gray-400 mt-2 text-center">Excelente trabajo, sigue así.</Text>
-        <Pressable
-          onPress={() => router.back()}
-          className="bg-primary rounded-xl px-6 py-3 mt-6"
-        >
-          <Text className="text-black font-semibold">Volver a rutinas</Text>
-        </Pressable>
+        <GlowOrb color={colors.gold} size={420} style={{ top: '18%' }} intensity={0.28} drift={10} />
+        <CelebrationTrophy />
+        <FadeIn delay={250} style={{ alignItems: 'center' }}>
+          <Text className="text-white text-3xl font-extrabold mt-7 text-center">¡Entrenamiento completado!</Text>
+          <Text className="text-gray-400 mt-2 text-center">Excelente trabajo, sigue así. 💪</Text>
+          <View className="flex-row gap-3 mt-6">
+            <View className="bg-surface border border-border rounded-2xl px-4 py-3 items-center">
+              <Text className="text-white text-xl font-extrabold">{queue.length}</Text>
+              <Text className="text-gray-400 text-xs">ejercicios</Text>
+            </View>
+            <View className="bg-surface border border-border rounded-2xl px-4 py-3 items-center">
+              <Text className="text-white text-xl font-extrabold">{totalSets}</Text>
+              <Text className="text-gray-400 text-xs">series</Text>
+            </View>
+          </View>
+        </FadeIn>
+        <FadeIn delay={450} style={{ alignSelf: 'stretch', marginTop: 32 }}>
+          <GradientButton title="Volver" onPress={() => router.back()} icon={<Check color="#04120a" size={18} />} />
+        </FadeIn>
+        <Confetti />
       </View>
     )
   }
 
+  const nextLabel = currentExercise
+    ? currentSet < currentExercise.sets
+      ? `Serie ${currentSet + 1} de ${currentExercise.sets}`
+      : queue[currentIndex + 1]?.name || 'Terminar'
+    : ''
+
+  // ----- Descanso -----
   if (phase === 'resting') {
     return (
       <View className="flex-1 bg-background items-center justify-center px-6">
-        <Text className="text-gray-400 text-sm mb-2">Descanso</Text>
-        <Text className="text-primary text-6xl font-bold mb-6">{secondsLeft}s</Text>
-        <Pressable onPress={goToNextStep} className="flex-row items-center gap-2">
-          <SkipForward color="#9ca8a5" size={16} />
-          <Text className="text-gray-400 text-sm font-medium">Saltar descanso</Text>
-        </Pressable>
+        <GlowOrb color={colors.primary} size={380} intensity={0.3} drift={8} duration={2400} />
+        <Text className="text-gray-400 text-xs font-bold uppercase mb-6" style={{ letterSpacing: 3 }}>
+          Descanso
+        </Text>
+        <AnimatedRing key={restRound} progress={0} from={100} duration={(currentExercise?.rest_seconds || 60) * 1000} linear size={250} stroke={14}>
+          <Text className="text-white font-extrabold" style={{ fontSize: 64, lineHeight: 70 }}>
+            {secondsLeft}
+          </Text>
+          <Text className="text-gray-400 text-sm">segundos</Text>
+        </AnimatedRing>
+        <View className="bg-surface border border-border rounded-2xl px-4 py-3 mt-8 items-center">
+          <Text className="text-gray-500 text-xs">Siguiente</Text>
+          <Text className="text-white font-semibold mt-0.5">{nextLabel}</Text>
+        </View>
+        <PressableScale onPress={goToNextStep} accessibilityLabel="Saltar descanso" style={{ marginTop: 20 }}>
+          <View className="flex-row items-center gap-2 px-5 py-3 rounded-full border border-border">
+            <SkipForward color={colors.soft} size={16} />
+            <Text className="text-gray-300 text-sm font-semibold">Saltar descanso</Text>
+          </View>
+        </PressableScale>
       </View>
     )
   }
 
+  // ----- Ejercicio -----
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 16, paddingTop: 60 }}>
-      <View className="flex-row items-center justify-between mb-4">
-        <Text className="text-gray-400 text-xs">
-          Ejercicio {currentIndex + 1} de {queue.length}
-        </Text>
+    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 16, paddingTop: 60, paddingBottom: 40 }}>
+      <View className="flex-row items-center mb-5">
         <Pressable onPress={() => router.back()} accessibilityLabel="Salir del entrenamiento" hitSlop={12}>
-          <X color="#6b7876" size={20} />
+          <X color={colors.muted} size={22} />
         </Pressable>
+        <ProgressBar value={(currentIndex + (currentSet - 1) / Math.max(1, currentExercise?.sets || 1)) / queue.length} />
+        <Text className="text-gray-400 text-xs font-semibold">{currentIndex + 1 + '/' + queue.length}</Text>
       </View>
 
-      {currentExercise?.gif_url ? (
-        <Image
-          source={{ uri: `${process.env.EXPO_PUBLIC_API_URL}${currentExercise.gif_url}` }}
-          className="w-full aspect-square rounded-2xl bg-surface2 mb-5"
-          resizeMode="cover"
-        />
-      ) : (
-        <View className="w-full aspect-square rounded-2xl bg-surface2 mb-5" />
-      )}
+      <FadeIn key={currentExercise?.id}>
+        <View className="rounded-3xl overflow-hidden border border-border mb-5" style={glow(colors.primary, 20, 0.18)}>
+          {currentExercise?.gif_url ? (
+            <Image
+              source={{ uri: `${process.env.EXPO_PUBLIC_API_URL}${currentExercise.gif_url}` }}
+              className="w-full aspect-square bg-surface2"
+              resizeMode="cover"
+            />
+          ) : (
+            <View className="w-full aspect-square items-center justify-center">
+              <GradientFill colors={gradients.steel} />
+              <Dumbbell color={colors.muted} size={72} />
+            </View>
+          )}
+        </View>
 
-      <Text className="text-white text-xl font-bold">{currentExercise?.name}</Text>
-      <Text className="text-gray-400 text-sm mt-1">
-        Serie {currentSet} de {currentExercise?.sets} · {currentExercise?.reps} repeticiones
-      </Text>
+        <Text className="text-white text-2xl font-extrabold">{currentExercise?.name}</Text>
+        <View className="flex-row gap-2 mt-3">
+          <View className="flex-row items-center gap-1.5 bg-green-500/15 rounded-full px-3 py-1.5">
+            <Layers color={colors.primary} size={13} />
+            <Text className="text-primary text-xs font-bold">{'Serie ' + currentSet + ' de ' + currentExercise?.sets}</Text>
+          </View>
+          <View className="flex-row items-center gap-1.5 bg-surface2 rounded-full px-3 py-1.5">
+            <Repeat color={colors.soft} size={13} />
+            <Text className="text-gray-300 text-xs font-semibold">{currentExercise?.reps + ' repeticiones'}</Text>
+          </View>
+        </View>
+        <SetDots total={currentExercise?.sets || 1} current={currentSet} />
+      </FadeIn>
 
-      <Pressable
+      <GradientButton
+        title="Completar serie"
         onPress={handleCompleteSet}
-        className="bg-primary rounded-xl py-4 items-center mt-8"
-      >
-        <Text className="text-black font-semibold">Completar serie</Text>
-      </Pressable>
+        icon={<Check color="#04120a" size={18} strokeWidth={3} />}
+        style={{ marginTop: 28 }}
+      />
+      <Text className="text-gray-500 text-xs text-center mt-3">{'Después: ' + nextLabel}</Text>
     </ScrollView>
   )
 }

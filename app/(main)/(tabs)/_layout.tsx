@@ -4,6 +4,7 @@ import { Tabs, useRouter } from 'expo-router'
 import * as Notifications from 'expo-notifications'
 import { Home, Dumbbell, TrendingUp, Utensils, Users } from 'lucide-react-native'
 import { checkAssignedRoutines, checkNewBadges } from '../../../core/appChecks'
+import AnimatedTabBar from '../../../components/ui/AnimatedTabBar'
 
 // Solo las 5 pestanas visibles. Las demas pantallas (perfil, retos, entrenar...) viven en el
 // Stack de (main): desde el SDK 58 una pestana con href: null ya no se puede abrir.
@@ -34,17 +35,7 @@ export default function TabsLayout() {
   }, [lastResponse, router])
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: '#22c55e',
-        tabBarInactiveTintColor: '#6b7876',
-        tabBarStyle: {
-          backgroundColor: '#0a0f0d',
-          borderTopColor: '#2a3532',
-        },
-      }}
-    >
+    <Tabs tabBar={(props) => <AnimatedTabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tabs.Screen
         name="dashboard"
         options={{

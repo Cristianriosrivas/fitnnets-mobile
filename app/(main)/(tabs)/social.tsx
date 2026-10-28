@@ -3,6 +3,11 @@ import { View, Text, ScrollView, Pressable, TextInput, RefreshControl } from 're
 import { useRouter } from 'expo-router'
 import { Search, UserPlus, Check, X, Users, Trophy, PlusCircle } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
+import FadeIn from '../../../components/ui/FadeIn'
+import PressableScale from '../../../components/ui/PressableScale'
+import GradientFill from '../../../components/ui/GradientFill'
+import { GlowOrb } from '../../../components/ui/Aurora'
+import { colors, glow, gradients } from '../../../components/ui/theme'
 
 export default function SocialScreen() {
   const router = useRouter()
@@ -98,16 +103,24 @@ export default function SocialScreen() {
       contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: 30 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22c55e" />}
     >
-      <View className="flex-row items-center justify-between mb-5">
-        <Text className="text-white text-2xl font-bold">Social</Text>
-        <Pressable
-          onPress={() => router.push('/(main)/retos')}
-          className="bg-primary rounded-lg px-3 py-2 flex-row items-center gap-1.5"
-        >
-          <Trophy color="black" size={14} />
-          <Text className="text-black text-xs font-semibold">Ver retos</Text>
-        </Pressable>
-      </View>
+      <GlowOrb color={colors.sky} size={340} style={{ top: -170, left: -130 }} intensity={0.22} />
+      <FadeIn>
+        <View className="flex-row items-end justify-between mb-5">
+          <View>
+            <Text className="text-primary text-xs font-bold uppercase" style={{ letterSpacing: 2 }}>
+              Comunidad
+            </Text>
+            <Text className="text-white text-3xl font-extrabold mt-1">Social</Text>
+          </View>
+          <PressableScale onPress={() => router.push('/(main)/retos')} accessibilityLabel="Ver retos">
+            <View className="rounded-full px-4 py-2.5 flex-row items-center gap-1.5 overflow-hidden" style={glow(colors.gold, 12, 0.4)}>
+              <GradientFill colors={gradients.gold} radius={999} direction="horizontal" />
+              <Trophy color="#422006" size={15} />
+              <Text style={{ color: '#422006', fontWeight: '800', fontSize: 13 }}>Ver retos</Text>
+            </View>
+          </PressableScale>
+        </View>
+      </FadeIn>
 
       <View className="bg-surface border border-border rounded-xl p-4 mb-5">
         <Text className="text-white font-medium mb-2">Buscar amigos</Text>

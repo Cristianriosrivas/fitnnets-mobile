@@ -4,12 +4,17 @@ import {
 } from 'react-native'
 import { useFocusEffect } from 'expo-router'
 import { LineChart } from 'react-native-chart-kit'
-import Svg, { Circle } from 'react-native-svg'
 import {
   Weight, Percent, Dumbbell, TrendingUp, TrendingDown, ArrowUp,
   Flame, Clock, Activity, Plus, Target, Check,
 } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
+import AnimatedRing from '../../../components/ui/AnimatedRing'
+import CountUp from '../../../components/ui/CountUp'
+import TiltCard from '../../../components/ui/TiltCard'
+import FadeIn from '../../../components/ui/FadeIn'
+import { GlowOrb } from '../../../components/ui/Aurora'
+import { colors } from '../../../components/ui/theme'
 import { checkNewBadges } from '../../../core/appChecks'
 
 const screenWidth = Dimensions.get('window').width
@@ -20,8 +25,6 @@ const GOAL_OPTIONS = [
   { value: 'mantenimiento', label: '⚖️ Mantenimiento' },
   { value: 'resistencia', label: '🏃 Mejorar resistencia' },
 ]
-const RING_RADIUS = 42
-const RING_LENGTH = 2 * Math.PI * RING_RADIUS
 
 export default function ProgresoScreen() {
   const [activeTab, setActiveTab] = useState('Progreso')
@@ -214,8 +217,14 @@ export default function ProgresoScreen() {
       contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: 30 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22c55e" />}
     >
-      <Text className="text-white text-2xl font-bold">Tu Progreso</Text>
-      <Text className="text-gray-400 text-sm mt-0.5 mb-4">Los resultados se construyen con información.</Text>
+      <GlowOrb color={colors.teal} size={340} style={{ top: -170, left: -120 }} intensity={0.24} />
+      <FadeIn>
+        <Text className="text-primary text-xs font-bold uppercase" style={{ letterSpacing: 2 }}>
+          Tu evolución
+        </Text>
+        <Text className="text-white text-3xl font-extrabold mt-1">Tu progreso</Text>
+        <Text className="text-gray-400 text-sm mt-1 mb-4">Los resultados se construyen con información.</Text>
+      </FadeIn>
 
       {activeTab === 'Progreso' && (
         <Pressable
@@ -493,50 +502,26 @@ function StatCard({
   children?: React.ReactNode
 }) {
   return (
-    <View className="bg-surface border border-border rounded-2xl p-4 mb-3" style={{ width: '48.5%' }}>
-      <View className="flex-row items-center gap-1.5 mb-2">
-        {icon}
-        <Text className="text-gray-400 text-xs flex-1">{label}</Text>
-      </View>
-      <Text className="text-white text-xl font-bold">{value}</Text>
-      {children}
+    <View style={{ width: '48.5%', marginBottom: 12 }}>
+      <TiltCard maxTilt={12} radius={22}>
+        <View className="bg-surface border border-border rounded-[22px] p-4">
+          <View className="flex-row items-center gap-1.5 mb-2">
+            {icon}
+            <Text className="text-gray-400 text-xs flex-1">{label}</Text>
+          </View>
+          <Text className="text-white text-2xl font-extrabold">{value}</Text>
+          {children}
+        </View>
+      </TiltCard>
     </View>
   )
 }
 
 function ProgressRing({ percent, caption }: { percent: number; caption: string }) {
   return (
-    <View style={{ width: 96, height: 96 }}>
-      <Svg width={96} height={96} viewBox="0 0 100 100">
-        <Circle cx="50" cy="50" r={RING_RADIUS} fill="none" stroke="#1f2926" strokeWidth={10} />
-        <Circle
-          cx="50"
-          cy="50"
-          r={RING_RADIUS}
-          fill="none"
-          stroke="#22c55e"
-          strokeWidth={10}
-          strokeDasharray={RING_LENGTH}
-          strokeDashoffset={RING_LENGTH * (1 - percent / 100)}
-          strokeLinecap="round"
-          rotation="-90"
-          origin="50, 50"
-        />
-      </Svg>
-      <View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Text className="text-white text-lg font-bold">{percent}%</Text>
-        <Text style={{ fontSize: 9, color: '#9ca8a5' }}>{caption}</Text>
-      </View>
-    </View>
+    <AnimatedRing progress={percent} size={100} stroke={11} delay={200}>
+      <CountUp value={percent} suffix="%" delay={200} className="text-white text-lg font-extrabold" />
+      <Text style={{ fontSize: 9, color: colors.soft, textAlign: 'center', lineHeight: 11 }}>{caption}</Text>
+    </AnimatedRing>
   )
 }
