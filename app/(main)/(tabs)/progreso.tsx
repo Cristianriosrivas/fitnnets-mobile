@@ -10,6 +10,7 @@ import {
   Flame, Clock, Activity, Plus, Target, Check,
 } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
+import { checkNewBadges } from '../../../core/appChecks'
 
 const screenWidth = Dimensions.get('window').width
 const TABS = ['Progreso', 'Métricas', 'Metas']
@@ -159,6 +160,7 @@ export default function ProgresoScreen() {
     setShowWeightModal(false)
     setSavingWeight(false)
     await loadData()
+    checkNewBadges()
   }
 
   const handleSaveGoal = async () => {

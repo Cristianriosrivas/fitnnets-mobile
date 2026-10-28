@@ -1,9 +1,38 @@
-import { Tabs } from 'expo-router'
+import { useEffect } from 'react'
+import { AppState } from 'react-native'
+import { Tabs, useRouter } from 'expo-router'
+import * as Notifications from 'expo-notifications'
 import { Home, Dumbbell, TrendingUp, Utensils, Users } from 'lucide-react-native'
+import { checkAssignedRoutines, checkNewBadges } from '../../../core/appChecks'
 
 // Solo las 5 pestanas visibles. Las demas pantallas (perfil, retos, entrenar...) viven en el
 // Stack de (main): desde el SDK 58 una pestana con href: null ya no se puede abrir.
 export default function TabsLayout() {
+  const router = useRouter()
+  const lastResponse = Notifications.useLastNotificationResponse()
+
+  // Al abrir la app y cada vez que vuelve al frente: rutinas asignadas e insignias nuevas
+  useEffect(() => {
+    const runChecks = () => {
+      checkAssignedRoutines()
+      checkNewBadges()
+    }
+    runChecks()
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') runChecks()
+    })
+    return () => subscription.remove()
+  }, [])
+
+  // Tocar una notificacion abre la pantalla que trae en data.url
+  useEffect(() => {
+    const url = lastResponse?.notification.request.content.data?.url
+    if (typeof url === 'string') {
+      router.push(url)
+      Notifications.clearLastNotificationResponseAsync()
+    }
+  }, [lastResponse, router])
+
   return (
     <Tabs
       screenOptions={{

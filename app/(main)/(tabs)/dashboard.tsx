@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { View, Text, ScrollView, RefreshControl, Pressable } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import Svg, { Circle } from 'react-native-svg'
-import { Weight, Ruler, Dumbbell, Flame, Play, Droplet } from 'lucide-react-native'
+import { Weight, Ruler, Dumbbell, Flame, Play, Droplet, Trophy, ChevronRight } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
 
 const TIPS = [
@@ -270,6 +270,21 @@ export default function DashboardScreen() {
           </View>
         </View>
       </View>
+
+      {/* Logros */}
+      <Pressable
+        onPress={() => router.push('/(main)/logros')}
+        className="bg-surface border border-border rounded-2xl p-4 mb-4 flex-row items-center gap-3"
+      >
+        <View className="bg-yellow-500/15 rounded-lg p-2">
+          <Trophy color="#facc15" size={18} />
+        </View>
+        <View className="flex-1">
+          <Text className="text-white font-semibold text-sm">Logros e insignias</Text>
+          <Text className="text-gray-400 text-xs mt-0.5">Mira lo que has desbloqueado y lo que te falta</Text>
+        </View>
+        <ChevronRight color="#6b7876" size={16} />
+      </Pressable>
 
       {/* Consejo del dia */}
       <View className="bg-surface border border-border rounded-2xl p-5">

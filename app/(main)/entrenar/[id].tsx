@@ -3,6 +3,7 @@ import { View, Text, Pressable, Image, ScrollView } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { CheckCircle2, X, SkipForward } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
+import { checkNewBadges } from '../../../core/appChecks'
 
 type FlatExercise = {
   id: string
@@ -92,13 +93,15 @@ export default function EntrenarScreen() {
       setPhase('exercise')
       return
     }
-    logProgress(currentExercise.id, currentExercise.sets, currentExercise.reps)
+    const logged = logProgress(currentExercise.id, currentExercise.sets, currentExercise.reps)
     if (currentIndex < queue.length - 1) {
       setCurrentIndex((i) => i + 1)
       setCurrentSet(1)
       setPhase('exercise')
     } else {
       setPhase('done')
+      // Cuando se guarda el ultimo ejercicio, revisa si el entrenamiento desbloqueo insignias
+      logged.then(() => checkNewBadges())
     }
   }
 
