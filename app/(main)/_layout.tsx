@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Tabs, Redirect } from 'expo-router'
+import { Stack, Redirect } from 'expo-router'
 import { View, Text, Pressable, ActivityIndicator } from 'react-native'
-import { Home, Dumbbell, TrendingUp, Utensils, Users } from 'lucide-react-native'
 import { supabase } from '../../core/supabase/client'
 import { CONSENT_VERSION, consentFromMetadata } from '../../core/legal'
+
+// Si se entra directo a una pantalla apilada (p. ej. por un enlace), "atras" vuelve a las pestanas
+export const unstable_settings = { anchor: '(tabs)' }
 
 // Orden de los filtros: sesion -> autorizacion vigente -> perfil completo (onboarding)
 type Gate = 'checking' | 'error' | 'login' | 'consent' | 'onboarding' | 'ready'
@@ -94,58 +96,10 @@ export default function MainLayout() {
     return <Redirect href="/onboarding" />
   }
 
+  // (tabs) queda siempre debajo; perfil, retos, rutinas-nueva, entrenar y privacidad se apilan encima
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: '#22c55e',
-        tabBarInactiveTintColor: '#6b7876',
-        tabBarStyle: {
-          backgroundColor: '#0a0f0d',
-          borderTopColor: '#2a3532',
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="dashboard"
-        options={{
-          title: 'Inicio',
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="rutinas"
-        options={{
-          title: 'Rutinas',
-          tabBarIcon: ({ color, size }) => <Dumbbell color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="progreso"
-        options={{
-          title: 'Progreso',
-          tabBarIcon: ({ color, size }) => <TrendingUp color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="nutricion"
-        options={{
-          title: 'Nutricion',
-          tabBarIcon: ({ color, size }) => <Utensils color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="social"
-        options={{
-          title: 'Social',
-          tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen name="retos" options={{ href: null }} />
-      <Tabs.Screen name="rutinas-nueva" options={{ href: null }} />
-      <Tabs.Screen name="perfil" options={{ href: null }} />
-      <Tabs.Screen name="entrenar/[id]" options={{ href: null }} />
-      <Tabs.Screen name="privacidad" options={{ href: null }} />
-    </Tabs>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0a0f0d' } }}>
+      <Stack.Screen name="(tabs)" />
+    </Stack>
   )
 }

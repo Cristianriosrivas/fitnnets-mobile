@@ -118,7 +118,7 @@ export default function PrivacidadScreen() {
       contentContainerStyle={{ padding: 16, paddingTop: 60, paddingBottom: 40 }}
     >
       <View className="flex-row items-center gap-3 mb-5">
-        <Pressable onPress={() => router.navigate('/(main)/perfil')} accessibilityLabel="Volver al perfil" hitSlop={12}>
+        <Pressable onPress={() => router.back()} accessibilityLabel="Volver al perfil" hitSlop={12}>
           <ArrowLeft color="#9ca8a5" size={20} />
         </Pressable>
         <Text className="text-white text-2xl font-bold">Privacidad y cuenta</Text>

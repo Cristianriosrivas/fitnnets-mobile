@@ -41,7 +41,7 @@ export default function ConsentScreen() {
       return
     }
 
-    router.replace('/(main)/dashboard')
+    router.replace('/(main)/(tabs)/dashboard')
   }
 
   const handleSignOut = async () => {

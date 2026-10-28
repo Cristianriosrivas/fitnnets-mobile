@@ -9,7 +9,7 @@ import {
   Weight, Percent, Dumbbell, TrendingUp, TrendingDown, ArrowUp,
   Flame, Clock, Activity, Plus, Target, Check,
 } from 'lucide-react-native'
-import { supabase } from '../../core/supabase/client'
+import { supabase } from '../../../core/supabase/client'
 
 const screenWidth = Dimensions.get('window').width
 const TABS = ['Progreso', 'Métricas', 'Metas']

@@ -128,7 +128,7 @@ export default function NuevaRutinaScreen() {
       setRoutineTitle('')
       setDays([{ title: 'Día 1', exercises: [] }])
       Alert.alert('Rutina enviada', friendName + ' la vera en su lista de rutinas, con tu nombre como creador.', [
-        { text: 'OK', onPress: () => router.replace('/(main)/social') },
+        { text: 'OK', onPress: () => router.back() },
       ])
       return
     }
@@ -194,7 +194,8 @@ export default function NuevaRutinaScreen() {
     setRoutineTitle('')
     setDays([{ title: 'Día 1', exercises: [] }])
     setSaving(false)
-    router.replace('/(main)/rutinas')
+    // Vuelve a Rutinas, que recarga la lista al recibir el foco
+    router.back()
   }
 
   return (

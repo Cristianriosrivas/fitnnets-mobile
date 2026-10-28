@@ -9,7 +9,7 @@ import {
   Sparkles, Plus, Pencil, Check, Calculator, CheckCircle2, Circle as CircleIcon,
   Sunrise, Sun, Moon, Cookie, Trash2, TrendingUp, Droplet,
 } from 'lucide-react-native'
-import { supabase } from '../../core/supabase/client'
+import { supabase } from '../../../core/supabase/client'
 
 const screenWidth = Dimensions.get('window').width
 

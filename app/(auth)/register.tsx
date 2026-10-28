@@ -69,7 +69,7 @@ export default function RegisterScreen() {
     // El trigger handle_new_user solo crea id y username: el consentimiento se guarda aqui
     await supabase.from('profiles').update(consent).eq('id', data.session.user.id)
 
-    router.replace('/(main)/dashboard')
+    router.replace('/(main)/(tabs)/dashboard')
   }
 
   const handleGoogleLogin = async () => {
@@ -106,7 +106,7 @@ export default function RegisterScreen() {
 
       if (access_token && refresh_token) {
         await supabase.auth.setSession({ access_token, refresh_token })
-        router.replace('/(main)/dashboard')
+        router.replace('/(main)/(tabs)/dashboard')
         return
       }
     }
@@ -120,7 +120,7 @@ export default function RegisterScreen() {
         setError('No se pudo completar el inicio con Google')
         return
       }
-      router.replace('/(main)/dashboard')
+      router.replace('/(main)/(tabs)/dashboard')
       return
     }
 

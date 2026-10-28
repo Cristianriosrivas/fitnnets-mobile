@@ -3,7 +3,7 @@ import { View, Text, ScrollView, RefreshControl, Pressable } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import Svg, { Circle } from 'react-native-svg'
 import { Weight, Ruler, Dumbbell, Flame, Play, Droplet } from 'lucide-react-native'
-import { supabase } from '../../core/supabase/client'
+import { supabase } from '../../../core/supabase/client'
 
 const TIPS = [
   'Mantén una buena hidratación. El agua mejora tu rendimiento y recuperación.',
@@ -206,7 +206,7 @@ export default function DashboardScreen() {
           <>
             <Text className="text-white font-semibold text-base">Aún no tienes una rutina</Text>
             <Pressable
-              onPress={() => router.push('/(main)/rutinas')}
+              onPress={() => router.push('/(main)/(tabs)/rutinas')}
               className="bg-primary rounded-xl py-3 mt-4 items-center"
             >
               <Text className="text-black font-semibold">Crear rutina</Text>

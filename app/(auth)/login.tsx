@@ -27,7 +27,7 @@ export default function LoginScreen() {
       return
     }
 
-    router.replace('/(main)/dashboard')
+    router.replace('/(main)/(tabs)/dashboard')
   }
 
   const handleGoogleLogin = async () => {
@@ -66,7 +66,7 @@ export default function LoginScreen() {
 
       if (access_token && refresh_token) {
         await supabase.auth.setSession({ access_token, refresh_token })
-        router.replace('/(main)/dashboard')
+        router.replace('/(main)/(tabs)/dashboard')
         return
       }
     }
@@ -81,7 +81,7 @@ export default function LoginScreen() {
         setError('No se pudo completar el inicio con Google')
         return
       }
-      router.replace('/(main)/dashboard')
+      router.replace('/(main)/(tabs)/dashboard')
       return
     }
 

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { View, Text, ScrollView, Pressable, RefreshControl, Image, Alert } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { Sparkles, Play, PlusCircle, ChevronDown, Dumbbell, Trash2 } from 'lucide-react-native'
-import { supabase } from '../../core/supabase/client'
+import { supabase } from '../../../core/supabase/client'
 
 export default function RutinasScreen() {
   const router = useRouter()

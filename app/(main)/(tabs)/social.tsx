@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, ScrollView, Pressable, TextInput, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Search, UserPlus, Check, X, Users, Trophy, PlusCircle } from 'lucide-react-native'
-import { supabase } from '../../core/supabase/client'
+import { supabase } from '../../../core/supabase/client'
 
 export default function SocialScreen() {
   const router = useRouter()

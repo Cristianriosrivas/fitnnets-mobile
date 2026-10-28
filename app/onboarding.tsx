@@ -90,7 +90,7 @@ export default function OnboardingScreen() {
     }
 
     setLoading(false)
-    router.replace('/(main)/dashboard')
+    router.replace('/(main)/(tabs)/dashboard')
   }
 
   const OptionButton = ({

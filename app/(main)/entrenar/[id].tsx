@@ -144,7 +144,7 @@ export default function EntrenarScreen() {
         </Text>
         <Text className="text-gray-400 mt-2 text-center">Excelente trabajo, sigue así.</Text>
         <Pressable
-          onPress={() => router.replace('/(main)/rutinas')}
+          onPress={() => router.back()}
           className="bg-primary rounded-xl px-6 py-3 mt-6"
         >
           <Text className="text-black font-semibold">Volver a rutinas</Text>
@@ -172,7 +172,7 @@ export default function EntrenarScreen() {
         <Text className="text-gray-400 text-xs">
           Ejercicio {currentIndex + 1} de {queue.length}
         </Text>
-        <Pressable onPress={() => router.replace('/(main)/rutinas')}>
+        <Pressable onPress={() => router.back()} accessibilityLabel="Salir del entrenamiento" hitSlop={12}>
           <X color="#6b7876" size={20} />
         </Pressable>
       </View>
