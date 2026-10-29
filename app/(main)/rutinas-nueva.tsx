@@ -1,9 +1,20 @@
 import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, Pressable, TextInput, Alert } from 'react-native'
+import { View, Text, ScrollView, Pressable, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native'
 import { Picker } from '@react-native-picker/picker'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { Plus, Trash2, ArrowLeft } from 'lucide-react-native'
+import { Plus, Trash2, ArrowLeft, Dumbbell, Users, Send, Check } from 'lucide-react-native'
 import { supabase } from '../../core/supabase/client'
+import FadeIn from '../../components/ui/FadeIn'
+import PressableScale from '../../components/ui/PressableScale'
+import GradientButton from '../../components/ui/GradientButton'
+import IconBadge from '../../components/ui/IconBadge'
+import { GlowOrb } from '../../components/ui/Aurora'
+import { colors, gradients } from '../../components/ui/theme'
+
+// En iOS la rueda del selector va sobre la tarjeta oscura (texto blanco); en Android
+// se abre una lista blanca (texto negro)
+const PICKER_ITEM_COLOR = Platform.OS === 'ios' ? '#ffffff' : '#000000'
+const DAY_GRADIENTS = [gradients.brand, gradients.ocean, gradients.violet, gradients.ember, gradients.gold]
 
 type ExerciseCatalogItem = { id: string; name: string }
 type DayExercise = { exercise_id: string; name: string; sets: number; reps: string; rest_seconds: number }
@@ -199,120 +210,158 @@ export default function NuevaRutinaScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 16, paddingTop: 60, paddingBottom: 40 }}>
-      <View className="flex-row items-center gap-3 mb-5">
-        <Pressable onPress={() => router.back()}>
-          <ArrowLeft color="#9ca8a5" size={20} />
-        </Pressable>
-        <Text className="text-white text-xl font-bold">
-          {forFriend ? 'Rutina para ' + friendName : 'Crear rutina personalizada'}
-        </Text>
-      </View>
+    <KeyboardAvoidingView className="flex-1 bg-background" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView
+        className="flex-1"
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ padding: 16, paddingTop: 60, paddingBottom: 48 }}
+      >
+        <GlowOrb color={forFriend ? colors.sky : colors.primary} size={340} style={{ top: -170, right: -130 }} intensity={0.24} />
 
-      {forFriend && (
-        <View className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-5">
-          <Text className="text-blue-300 text-xs">
-            {'Esta rutina aparecera en la lista de ' + friendName + ' con tu nombre como creador.'}
-          </Text>
-        </View>
-      )}
-
-      <Text className="text-gray-400 text-xs mb-1">Nombre de la rutina</Text>
-      <TextInput
-        value={routineTitle}
-        onChangeText={setRoutineTitle}
-        placeholder="ej: Mi rutina de fuerza"
-        placeholderTextColor="#6b7876"
-        className="bg-surface2 border border-border rounded-xl px-4 py-3 text-white mb-5"
-      />
-
-      {days.map((day, dayIndex) => (
-        <View key={dayIndex} className="bg-surface border border-border rounded-2xl p-4 mb-4">
-          <View className="flex-row items-center gap-2 mb-3">
-            <TextInput
-              value={day.title}
-              onChangeText={(text) => updateDayTitle(dayIndex, text)}
-              className="flex-1 bg-surface2 border border-border rounded-lg px-3 py-2 text-white font-semibold"
-            />
-            {days.length > 1 && (
-              <Pressable onPress={() => removeDay(dayIndex)}>
-                <Trash2 color="#6b7876" size={18} />
-              </Pressable>
-            )}
-          </View>
-
-          {day.exercises.map((ex, exIndex) => (
-            <View key={exIndex} className="bg-surface2 rounded-lg p-3 mb-3">
-              <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-gray-400 text-xs">Ejercicio</Text>
-                <Pressable onPress={() => removeExerciseFromDay(dayIndex, exIndex)}>
-                  <Trash2 color="#6b7876" size={16} />
-                </Pressable>
-              </View>
-
-              <View className="bg-background border border-border rounded-lg mb-2">
-                <Picker
-                  selectedValue={ex.exercise_id}
-                  onValueChange={(value) => updateExercise(dayIndex, exIndex, 'exercise_id', value)}
-                  style={{ color: 'white' }}
-                  dropdownIconColor="#9ca8a5"
-                >
-                  {catalog.map((c) => (
-                    <Picker.Item key={c.id} label={c.name} value={c.id} color="black" />
-                  ))}
-                </Picker>
-              </View>
-
-              <View className="flex-row gap-2">
-                <View className="flex-1">
-                  <Text className="text-gray-500 text-[10px] mb-1">Series</Text>
-                  <TextInput
-                    value={String(ex.sets)}
-                    onChangeText={(v) => updateExercise(dayIndex, exIndex, 'sets', parseInt(v) || 0)}
-                    keyboardType="number-pad"
-                    className="bg-background border border-border rounded-lg px-2 py-1.5 text-white text-sm"
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-gray-500 text-[10px] mb-1">Reps</Text>
-                  <TextInput
-                    value={ex.reps}
-                    onChangeText={(v) => updateExercise(dayIndex, exIndex, 'reps', v)}
-                    className="bg-background border border-border rounded-lg px-2 py-1.5 text-white text-sm"
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-gray-500 text-[10px] mb-1">Desc. (s)</Text>
-                  <TextInput
-                    value={String(ex.rest_seconds)}
-                    onChangeText={(v) => updateExercise(dayIndex, exIndex, 'rest_seconds', parseInt(v) || 0)}
-                    keyboardType="number-pad"
-                    className="bg-background border border-border rounded-lg px-2 py-1.5 text-white text-sm"
-                  />
-                </View>
-              </View>
+        <FadeIn>
+          <View className="flex-row items-end gap-3 mb-5">
+            <Pressable onPress={() => router.back()} accessibilityLabel="Volver" hitSlop={12} className="mb-1.5">
+              <ArrowLeft color={colors.soft} size={22} />
+            </Pressable>
+            <View className="flex-1">
+              <Text className="text-primary text-xs font-bold uppercase" style={{ letterSpacing: 2 }}>
+                {forFriend ? 'Para un amigo' : 'A tu medida'}
+              </Text>
+              <Text className="text-white text-3xl font-extrabold mt-1" numberOfLines={2}>
+                {forFriend ? 'Rutina para ' + friendName : 'Crear rutina'}
+              </Text>
             </View>
-          ))}
+          </View>
+        </FadeIn>
 
-          <Pressable onPress={() => addExerciseToDay(dayIndex)} className="flex-row items-center gap-1.5">
-            <Plus color="#22c55e" size={16} />
-            <Text className="text-primary text-sm font-medium">Agregar ejercicio</Text>
-          </Pressable>
-        </View>
-      ))}
+        {forFriend && (
+          <View className="bg-sky-500/10 border border-sky-500/25 rounded-2xl p-3 mb-5 flex-row items-center gap-3">
+            <Users color={colors.sky} size={18} />
+            <Text className="text-sky-300 text-xs flex-1">
+              {'Esta rutina aparecerá en la lista de ' + friendName + ' con tu nombre como creador.'}
+            </Text>
+          </View>
+        )}
 
-      <Pressable onPress={addDay} className="flex-row items-center gap-1.5 mb-5">
-        <Plus color="#9ca8a5" size={16} />
-        <Text className="text-gray-400 text-sm font-medium">Agregar otro día</Text>
-      </Pressable>
+        <Text className="text-gray-400 text-xs font-semibold mb-1.5 ml-1">Nombre de la rutina</Text>
+        <TextInput
+          value={routineTitle}
+          onChangeText={setRoutineTitle}
+          placeholder="ej: Mi rutina de fuerza"
+          placeholderTextColor={colors.muted}
+          className="bg-surface2 border border-border rounded-2xl px-4 py-3.5 text-white text-base mb-5"
+        />
 
-      {error ? <Text className="text-red-400 text-sm bg-red-500/10 p-3 rounded-lg mb-4">{error}</Text> : null}
+        {days.map((day, dayIndex) => (
+          <FadeIn key={dayIndex} distance={10}>
+            <View className="bg-surface border border-border rounded-3xl p-4 mb-4">
+              <View className="flex-row items-center gap-3 mb-3">
+                <IconBadge colors={DAY_GRADIENTS[dayIndex % DAY_GRADIENTS.length]} size={38} radius={12}>
+                  <Text style={{ color: '#04120a', fontWeight: '900', fontSize: 15 }}>{dayIndex + 1}</Text>
+                </IconBadge>
+                <TextInput
+                  value={day.title}
+                  onChangeText={(text) => updateDayTitle(dayIndex, text)}
+                  accessibilityLabel="Nombre del día"
+                  className="flex-1 bg-surface2 border border-border rounded-xl px-3 py-2.5 text-white font-bold"
+                />
+                {days.length > 1 && (
+                  <Pressable onPress={() => removeDay(dayIndex)} accessibilityLabel="Quitar día" hitSlop={10} className="p-1">
+                    <Trash2 color={colors.muted} size={18} />
+                  </Pressable>
+                )}
+              </View>
 
-      <Pressable onPress={handleSave} disabled={saving} className="bg-primary rounded-xl py-3.5 items-center">
-        <Text className="text-black font-semibold">
-          {saving ? 'Guardando...' : forFriend ? 'Enviar rutina a ' + friendName : 'Guardar rutina'}
-        </Text>
-      </Pressable>
-    </ScrollView>
+              {day.exercises.map((ex, exIndex) => (
+                <View key={exIndex} className="bg-surface2 rounded-2xl p-3 mb-3">
+                  <View className="flex-row items-center justify-between mb-2">
+                    <View className="flex-row items-center gap-2">
+                      <Dumbbell color={colors.primary} size={14} />
+                      <Text className="text-gray-300 text-xs font-semibold">{'Ejercicio ' + (exIndex + 1)}</Text>
+                    </View>
+                    <Pressable
+                      onPress={() => removeExerciseFromDay(dayIndex, exIndex)}
+                      accessibilityLabel="Quitar ejercicio"
+                      hitSlop={10}
+                    >
+                      <Trash2 color={colors.muted} size={16} />
+                    </Pressable>
+                  </View>
+
+                  <View className="bg-background border border-border rounded-xl mb-3 overflow-hidden">
+                    <Picker
+                      selectedValue={ex.exercise_id}
+                      onValueChange={(value) => updateExercise(dayIndex, exIndex, 'exercise_id', value)}
+                      style={{ color: 'white' }}
+                      itemStyle={{ color: 'white', fontSize: 16 }}
+                      dropdownIconColor={colors.soft}
+                    >
+                      {catalog.map((c) => (
+                        <Picker.Item key={c.id} label={c.name} value={c.id} color={PICKER_ITEM_COLOR} />
+                      ))}
+                    </Picker>
+                  </View>
+
+                  <View className="flex-row gap-2">
+                    <View className="flex-1">
+                      <Text className="text-gray-500 text-[11px] mb-1 ml-1">Series</Text>
+                      <TextInput
+                        value={String(ex.sets)}
+                        onChangeText={(v) => updateExercise(dayIndex, exIndex, 'sets', parseInt(v) || 0)}
+                        keyboardType="number-pad"
+                        className="bg-background border border-border rounded-xl px-3 py-2 text-white text-sm text-center"
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-gray-500 text-[11px] mb-1 ml-1">Reps</Text>
+                      <TextInput
+                        value={ex.reps}
+                        onChangeText={(v) => updateExercise(dayIndex, exIndex, 'reps', v)}
+                        className="bg-background border border-border rounded-xl px-3 py-2 text-white text-sm text-center"
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-gray-500 text-[11px] mb-1 ml-1">Descanso (s)</Text>
+                      <TextInput
+                        value={String(ex.rest_seconds)}
+                        onChangeText={(v) => updateExercise(dayIndex, exIndex, 'rest_seconds', parseInt(v) || 0)}
+                        keyboardType="number-pad"
+                        className="bg-background border border-border rounded-xl px-3 py-2 text-white text-sm text-center"
+                      />
+                    </View>
+                  </View>
+                </View>
+              ))}
+
+              <PressableScale onPress={() => addExerciseToDay(dayIndex)} accessibilityLabel="Agregar ejercicio">
+                <View className="flex-row items-center justify-center gap-1.5 rounded-2xl border border-dashed border-green-500/40 py-3">
+                  <Plus color={colors.primary} size={16} />
+                  <Text className="text-primary text-sm font-semibold">Agregar ejercicio</Text>
+                </View>
+              </PressableScale>
+            </View>
+          </FadeIn>
+        ))}
+
+        <PressableScale onPress={addDay} accessibilityLabel="Agregar otro día" style={{ marginBottom: 20 }}>
+          <View className="flex-row items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border py-3.5">
+            <Plus color={colors.soft} size={16} />
+            <Text className="text-gray-300 text-sm font-semibold">Agregar otro día</Text>
+          </View>
+        </PressableScale>
+
+        {error ? (
+          <Text className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 p-3 rounded-xl mb-4">{error}</Text>
+        ) : null}
+
+        <GradientButton
+          title={saving ? 'Guardando...' : forFriend ? 'Enviar rutina a ' + friendName : 'Guardar rutina'}
+          onPress={handleSave}
+          loading={saving}
+          colors={forFriend ? gradients.ocean : gradients.brand}
+          icon={forFriend ? <Send color="#04120a" size={17} /> : <Check color="#04120a" size={18} strokeWidth={3} />}
+        />
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }

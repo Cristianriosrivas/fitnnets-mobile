@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { View, Text, Pressable, ScrollView } from 'react-native'
+import { View, Text, Pressable } from 'react-native'
 import { useRouter } from 'expo-router'
+import { Check, ShieldCheck } from 'lucide-react-native'
 import { supabase } from '../core/supabase/client'
 import { buildConsent, CONTACT_EMAIL } from '../core/legal'
 import ConsentChecks from '../components/ConsentChecks'
+import AuthShell from '../components/ui/AuthShell'
+import GradientButton from '../components/ui/GradientButton'
+import { colors } from '../components/ui/theme'
 
 // Usuarios sin la autorizacion vigente (cuentas antiguas, Google o cambio de version de la politica).
 // Textos solo ASCII: es una pantalla previa a entrar a la app.
@@ -50,38 +54,36 @@ export default function ConsentScreen() {
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 48 }}
+    <AuthShell
+      title="Antes de continuar"
+      subtitle="Para usar Finnets necesitamos tu autorizacion para tratar tus datos personales, incluidos tus datos de salud, segun la Ley 1581 de 2012. Puedes revocarla cuando quieras eliminando tu cuenta."
     >
-      <View className="bg-surface border border-border rounded-2xl p-6">
-        <Text className="text-white text-xl font-bold mb-2">Antes de continuar</Text>
-        <Text className="text-gray-400 text-sm leading-5 mb-5">
-          Para usar Finnets necesitamos tu autorizacion para tratar tus datos personales, incluidos tus datos
-          de salud, segun la Ley 1581 de 2012. Puedes revocarla cuando quieras eliminando tu cuenta.
-        </Text>
-
-        <ConsentChecks terms={terms} health={health} onTermsChange={setTerms} onHealthChange={setHealth} />
-
-        {error ? <Text className="text-red-400 text-sm mb-3">{error}</Text> : null}
-
-        <Pressable
-          onPress={handleAccept}
-          disabled={saving}
-          className="bg-primary rounded-xl py-3 items-center mt-2"
-          style={{ opacity: saving || !terms || !health ? 0.5 : 1 }}
-        >
-          <Text className="text-black font-semibold">{saving ? 'Guardando...' : 'Aceptar y continuar'}</Text>
-        </Pressable>
-
-        <Pressable onPress={handleSignOut} disabled={saving} className="mt-4 py-2 items-center">
-          <Text className="text-gray-400 text-sm">No acepto, cerrar sesion</Text>
-        </Pressable>
-
-        <Text className="text-gray-500 text-xs text-center mt-3">
-          {'Dudas o solicitudes sobre tus datos: ' + CONTACT_EMAIL}
+      <View className="flex-row items-center gap-3 bg-surface2 rounded-2xl p-3 mb-5">
+        <ShieldCheck color={colors.primary} size={20} />
+        <Text className="text-gray-300 text-xs flex-1 leading-4">
+          Tus datos de salud solo se usan para personalizar tus rutinas y tu plan de comidas. No los vendemos ni los usamos para publicidad.
         </Text>
       </View>
-    </ScrollView>
+
+      <ConsentChecks terms={terms} health={health} onTermsChange={setTerms} onHealthChange={setHealth} />
+
+      {error ? <Text className="text-red-400 text-sm mb-3">{error}</Text> : null}
+
+      <GradientButton
+        title={saving ? 'Guardando...' : 'Aceptar y continuar'}
+        onPress={handleAccept}
+        loading={saving}
+        icon={<Check color="#04120a" size={18} strokeWidth={3} />}
+        style={{ marginTop: 6, opacity: terms && health ? 1 : 0.55 }}
+      />
+
+      <Pressable onPress={handleSignOut} disabled={saving} className="mt-4 py-2 items-center">
+        <Text className="text-gray-400 text-sm">No acepto, cerrar sesion</Text>
+      </Pressable>
+
+      <Text className="text-gray-500 text-xs text-center mt-3">
+        {'Dudas o solicitudes sobre tus datos: ' + CONTACT_EMAIL}
+      </Text>
+    </AuthShell>
   )
 }

@@ -5,6 +5,11 @@ import * as WebBrowser from 'expo-web-browser'
 import { ArrowLeft, ShieldCheck, FileText, Mail, LogOut, Trash2, ChevronRight } from 'lucide-react-native'
 import { supabase } from '../../core/supabase/client'
 import { CONSENT_VERSION, CONTACT_EMAIL, PRIVACY_URL, TERMS_URL } from '../../core/legal'
+import FadeIn from '../../components/ui/FadeIn'
+import GradientButton from '../../components/ui/GradientButton'
+import IconBadge from '../../components/ui/IconBadge'
+import { GlowOrb } from '../../components/ui/Aurora'
+import { colors, gradients } from '../../components/ui/theme'
 
 type ConsentRecord = {
   consent_version: string | null
@@ -117,18 +122,28 @@ export default function PrivacidadScreen() {
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ padding: 16, paddingTop: 60, paddingBottom: 40 }}
     >
-      <View className="flex-row items-center gap-3 mb-5">
-        <Pressable onPress={() => router.back()} accessibilityLabel="Volver al perfil" hitSlop={12}>
-          <ArrowLeft color="#9ca8a5" size={20} />
-        </Pressable>
-        <Text className="text-white text-2xl font-bold">Privacidad y cuenta</Text>
-      </View>
+      <GlowOrb color={colors.violet} size={340} style={{ top: -170, right: -130 }} intensity={0.24} />
+      <FadeIn>
+        <View className="flex-row items-end gap-3 mb-5">
+          <Pressable onPress={() => router.back()} accessibilityLabel="Volver al perfil" hitSlop={12} className="mb-1.5">
+            <ArrowLeft color={colors.soft} size={22} />
+          </Pressable>
+          <View>
+            <Text className="text-primary text-xs font-bold uppercase" style={{ letterSpacing: 2 }}>
+              Tus datos, tu decisión
+            </Text>
+            <Text className="text-white text-3xl font-extrabold mt-1">Privacidad</Text>
+          </View>
+        </View>
+      </FadeIn>
 
       {/* Autorizacion */}
-      <View className="bg-surface border border-border rounded-2xl p-4 mb-4">
-        <View className="flex-row items-center gap-2 mb-3">
-          <ShieldCheck color="#22c55e" size={18} />
-          <Text className="text-white font-semibold text-sm">Tu autorización</Text>
+      <View className="bg-surface border border-border rounded-3xl p-5 mb-4">
+        <View className="flex-row items-center gap-3 mb-4">
+          <IconBadge colors={gradients.violet} size={36} radius={12}>
+            <ShieldCheck color="#ffffff" size={18} />
+          </IconBadge>
+          <Text className="text-white font-bold text-base">Tu autorización</Text>
         </View>
 
         {loading ? (
@@ -166,7 +181,7 @@ export default function PrivacidadScreen() {
       </View>
 
       {/* Documentos y contacto */}
-      <View className="bg-surface border border-border rounded-2xl px-4 py-1 mb-4">
+      <View className="bg-surface border border-border rounded-3xl px-4 py-1 mb-4">
         <LinkRow
           icon={<ShieldCheck color="#9ca8a5" size={16} />}
           label="Política de privacidad"
@@ -189,7 +204,7 @@ export default function PrivacidadScreen() {
       {/* Sesion */}
       <Pressable
         onPress={handleSignOut}
-        className="bg-surface border border-border rounded-2xl px-4 py-3 mb-6 flex-row items-center gap-3"
+        className="bg-surface border border-border rounded-3xl px-4 py-3 mb-6 flex-row items-center gap-3"
         style={{ minHeight: 48 }}
       >
         <LogOut color="#9ca8a5" size={16} />
@@ -197,7 +212,7 @@ export default function PrivacidadScreen() {
       </Pressable>
 
       {/* Eliminar cuenta */}
-      <View className="bg-red-500/5 border border-red-500/30 rounded-2xl p-4">
+      <View className="bg-red-500/5 border border-red-500/30 rounded-3xl p-5">
         <View className="flex-row items-center gap-2 mb-2">
           <Trash2 color="#f87171" size={16} />
           <Text className="text-red-300 font-semibold text-sm">Eliminar mi cuenta</Text>
@@ -226,15 +241,15 @@ export default function PrivacidadScreen() {
           </View>
         ) : null}
 
-        <Pressable
+        <GradientButton
+          title={deleting ? 'Eliminando...' : 'Eliminar cuenta'}
           onPress={handleDelete}
           disabled={!canDelete}
-          className="bg-red-500 rounded-xl py-3 items-center flex-row justify-center gap-2"
-          style={{ opacity: canDelete ? 1 : 0.4 }}
-        >
-          {deleting ? <ActivityIndicator color="white" size="small" /> : null}
-          <Text className="text-white font-semibold">{deleting ? 'Eliminando...' : 'Eliminar cuenta'}</Text>
-        </Pressable>
+          loading={deleting}
+          colors={['#fb7185', '#dc2626']}
+          textColor="#ffffff"
+          icon={<Trash2 color="#ffffff" size={17} />}
+        />
       </View>
     </ScrollView>
   )

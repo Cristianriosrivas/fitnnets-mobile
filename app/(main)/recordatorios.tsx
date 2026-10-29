@@ -5,6 +5,11 @@ import { ArrowLeft, Bell, Dumbbell, Scale, Minus, Plus, Check } from 'lucide-rea
 import {
   applyReminders, ensureNotificationPermission, loadReminders, notifyNow, ReminderSettings, DEFAULT_REMINDERS,
 } from '../../core/notifications'
+import FadeIn from '../../components/ui/FadeIn'
+import GradientButton from '../../components/ui/GradientButton'
+import IconBadge from '../../components/ui/IconBadge'
+import { GlowOrb } from '../../components/ui/Aurora'
+import { colors, gradients } from '../../components/ui/theme'
 
 // 1 = domingo ... 7 = sabado (formato de expo-notifications), mostrados de lunes a domingo
 const WEEKDAYS = [
@@ -76,9 +81,11 @@ function ReminderCard({
   children: React.ReactNode
 }) {
   return (
-    <View className="bg-surface border border-border rounded-2xl p-4 mb-4">
+    <View className="bg-surface border border-border rounded-3xl p-4 mb-4">
       <View className="flex-row items-center gap-3">
-        <View className="bg-green-500/10 rounded-lg p-2">{icon}</View>
+        <IconBadge colors={gradients.brand} size={38} radius={12}>
+          {icon}
+        </IconBadge>
         <View className="flex-1">
           <Text className="text-white font-semibold text-sm">{title}</Text>
           <Text className="text-gray-500 text-xs mt-0.5">{subtitle}</Text>
@@ -168,18 +175,26 @@ export default function RecordatoriosScreen() {
 
   return (
     <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 16, paddingTop: 60, paddingBottom: 40 }}>
-      <View className="flex-row items-center gap-3 mb-2">
-        <Pressable onPress={() => router.back()} accessibilityLabel="Volver" hitSlop={12}>
-          <ArrowLeft color="#9ca8a5" size={20} />
-        </Pressable>
-        <Text className="text-white text-2xl font-bold">Recordatorios</Text>
-      </View>
-      <Text className="text-gray-400 text-sm mb-5">
-        Se programan en este teléfono y llegan aunque la app esté cerrada.
-      </Text>
+      <GlowOrb color={colors.primary} size={340} style={{ top: -170, left: -130 }} intensity={0.26} />
+      <FadeIn>
+        <View className="flex-row items-end gap-3 mb-2">
+          <Pressable onPress={() => router.back()} accessibilityLabel="Volver" hitSlop={12} className="mb-1.5">
+            <ArrowLeft color={colors.soft} size={22} />
+          </Pressable>
+          <View>
+            <Text className="text-primary text-xs font-bold uppercase" style={{ letterSpacing: 2 }}>
+              Constancia en piloto automático
+            </Text>
+            <Text className="text-white text-3xl font-extrabold mt-1">Recordatorios</Text>
+          </View>
+        </View>
+        <Text className="text-gray-400 text-sm mb-5">
+          Se programan en este teléfono y llegan aunque la app esté cerrada.
+        </Text>
+      </FadeIn>
 
       <ReminderCard
-        icon={<Dumbbell color="#22c55e" size={18} />}
+        icon={<Dumbbell color="#04120a" size={18} />}
         title="Recordarme entrenar"
         subtitle="Los días y la hora que elijas"
         enabled={settings.train.enabled}
@@ -194,7 +209,7 @@ export default function RecordatoriosScreen() {
       </ReminderCard>
 
       <ReminderCard
-        icon={<Scale color="#22c55e" size={18} />}
+        icon={<Scale color="#04120a" size={18} />}
         title="Recordarme registrar mi peso"
         subtitle="Una vez por semana"
         enabled={settings.weight.enabled}
@@ -230,17 +245,12 @@ export default function RecordatoriosScreen() {
       ) : null}
       {error ? <Text className="text-red-400 text-sm mb-4">{error}</Text> : null}
 
-      <Pressable
+      <GradientButton
+        title={saving ? 'Guardando...' : saved ? 'Recordatorios guardados' : 'Guardar recordatorios'}
         onPress={handleSave}
-        disabled={saving}
-        className="bg-primary rounded-xl py-3.5 items-center flex-row justify-center gap-2"
-        style={{ opacity: saving ? 0.5 : 1 }}
-      >
-        {saved ? <Check color="black" size={18} /> : null}
-        <Text className="text-black font-semibold">
-          {saving ? 'Guardando...' : saved ? 'Recordatorios guardados' : 'Guardar recordatorios'}
-        </Text>
-      </Pressable>
+        loading={saving}
+        icon={saved ? <Check color="#04120a" size={18} strokeWidth={3} /> : <Bell color="#04120a" size={17} />}
+      />
 
       <Pressable onPress={handleTest} className="mt-4 py-2 items-center">
         <Text className="text-gray-400 text-sm">Enviar una notificación de prueba</Text>
