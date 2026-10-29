@@ -1,4 +1,5 @@
 import { supabase } from './supabase/client'
+import { estimateOneRepMax } from './gym'
 
 // Registro de entrenamiento: peso, tiempo, recomendación de peso, rango y resumen.
 // Todo se calcula en el teléfono con reglas fijas (no gasta cuota de IA).
@@ -105,23 +106,25 @@ export async function loadWeightHistory(userId: string, exerciseIds: string[]): 
   return groupHistory((data || []) as unknown as LogRow[], (r) => r.routine_exercises?.exercise_id)
 }
 
-export type StrengthSeries = { exerciseId: string; name: string; points: WeightEntry[] } // puntos de más antiguo a más reciente
+// Puntos de más antiguo a más reciente. oneRm: mejor 1RM estimado del día (peso x repeticiones)
+export type StrengthPoint = WeightEntry & { oneRm: number }
+export type StrengthSeries = { exerciseId: string; name: string; points: StrengthPoint[] }
 
 // Evolución del peso levantado por ejercicio (pantalla Progreso)
 export async function loadStrengthSeries(userId: string): Promise<StrengthSeries[]> {
-  let rows: { id: string | undefined; name: string | undefined; weight: number; date: string }[] = []
+  let rows: { id: string | undefined; name: string | undefined; weight: number; reps: string; date: string }[] = []
 
   if (hasV2Columns !== false) {
     const { data, error } = await supabase
       .from('progress_logs')
-      .select('weight_used_kg, date, exercise_id, exercises(name)')
+      .select('weight_used_kg, reps_completed, date, exercise_id, exercises(name)')
       .eq('user_id', userId)
       .not('weight_used_kg', 'is', null)
       .order('created_at', { ascending: true })
       .limit(1000)
     if (!error) {
       hasV2Columns = true
-      rows = (data || []).map((r: any) => ({ id: r.exercise_id, name: r.exercises?.name, weight: Number(r.weight_used_kg), date: r.date }))
+      rows = (data || []).map((r: any) => ({ id: r.exercise_id, name: r.exercises?.name, weight: Number(r.weight_used_kg), reps: r.reps_completed || '', date: r.date }))
     } else if (isMissingColumn(error)) {
       hasV2Columns = false
     } else {
@@ -131,7 +134,7 @@ export async function loadStrengthSeries(userId: string): Promise<StrengthSeries
   if (hasV2Columns === false) {
     const { data, error } = await supabase
       .from('progress_logs')
-      .select('weight_used_kg, date, routine_exercises!inner(exercise_id, exercises(name))')
+      .select('weight_used_kg, reps_completed, date, routine_exercises!inner(exercise_id, exercises(name))')
       .eq('user_id', userId)
       .not('weight_used_kg', 'is', null)
       .order('created_at', { ascending: true })
@@ -141,18 +144,24 @@ export async function loadStrengthSeries(userId: string): Promise<StrengthSeries
       id: r.routine_exercises?.exercise_id,
       name: r.routine_exercises?.exercises?.name,
       weight: Number(r.weight_used_kg),
+      reps: r.reps_completed || '',
       date: r.date,
     }))
   }
 
-  // Un punto por día: el mayor peso de ese día
+  // Un punto por día: el mayor peso y el mejor 1RM estimado de ese día
   const byExercise = new Map<string, StrengthSeries>()
   for (const r of rows) {
     if (!r.id || !r.name) continue
     const series = byExercise.get(r.id) || { exerciseId: r.id, name: r.name, points: [] }
+    const oneRm = estimateOneRepMax(r.weight, averageReps(r.reps))
     const last = series.points[series.points.length - 1]
-    if (last && last.date === r.date) last.weight = Math.max(last.weight, r.weight)
-    else series.points.push({ weight: r.weight, date: r.date })
+    if (last && last.date === r.date) {
+      last.weight = Math.max(last.weight, r.weight)
+      last.oneRm = Math.max(last.oneRm, oneRm)
+    } else {
+      series.points.push({ weight: r.weight, oneRm, date: r.date })
+    }
     byExercise.set(r.id, series)
   }
   return Array.from(byExercise.values()).sort((a, b) => b.points.length - a.points.length)

@@ -21,6 +21,7 @@ import GradientFill from '../../../components/ui/GradientFill'
 import { colors, gradients } from '../../../components/ui/theme'
 import { checkNewBadges } from '../../../core/appChecks'
 import { loadStrengthSeries, StrengthSeries } from '../../../core/training'
+import { formatKg, strengthLevel } from '../../../core/gym'
 
 const screenWidth = Dimensions.get('window').width
 const TABS = ['Progreso', 'Métricas', 'Metas']
@@ -546,13 +547,18 @@ function StrengthSection() {
   const [series, setSeries] = useState<StrengthSeries[] | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [body, setBody] = useState<{ weightKg: number | null; gender: string | null }>({ weightKg: null, gender: null })
 
   const load = useCallback(async () => {
     setError('')
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     try {
-      const data = await loadStrengthSeries(user.id)
+      const [data, { data: p }] = await Promise.all([
+        loadStrengthSeries(user.id),
+        supabase.from('profiles').select('weight_kg, gender').eq('id', user.id).single(),
+      ])
+      setBody({ weightKg: p?.weight_kg ? Number(p.weight_kg) : null, gender: p?.gender ?? null })
       setSeries(data)
       setSelectedId((current) => current ?? data[0]?.exerciseId ?? null)
     } catch {
@@ -598,6 +604,8 @@ function StrengthSection() {
   const weights = selected.points.map((p) => p.weight)
   const best = Math.max(...weights)
   const gain = Math.round((weights[weights.length - 1] - weights[0]) * 100) / 100
+  const bestOneRm = Math.max(...selected.points.map((p) => p.oneRm))
+  const level = strengthLevel(selected.name, bestOneRm, body.weightKg, body.gender)
   const labelStep = Math.max(1, Math.ceil(selected.points.length / 4))
   const labels = selected.points.map((p, i) =>
     (selected.points.length - 1 - i) % labelStep === 0
@@ -636,6 +644,34 @@ function StrengthSection() {
             {(gain > 0 ? '+' : '') + gain + ' kg'}
           </Text>
         </View>
+      </View>
+
+      {/* 1RM estimado y nivel de fuerza relativo al peso corporal */}
+      <View className="rounded-3xl overflow-hidden p-4 mb-3" style={{ borderWidth: 1, borderColor: 'rgba(167,139,250,0.35)' }}>
+        <GradientFill colors={['#1e1b4b', '#141b19']} direction="horizontal" />
+        <View className="flex-row items-center justify-between">
+          <View>
+            <Text className="text-violet-300 text-xs font-semibold">1RM estimado</Text>
+            <View className="flex-row items-end mt-0.5">
+              <CountUp value={bestOneRm} decimals={Number.isInteger(bestOneRm) ? 0 : 1} className="text-white text-3xl font-extrabold" />
+              <Text className="text-gray-400 text-xs mb-1.5 ml-1">kg</Text>
+            </View>
+            <Text className="text-gray-500 text-[11px]">El máximo que podrías levantar 1 vez</Text>
+          </View>
+          {level ? (
+            <View className="items-end">
+              <View className="bg-violet-500/20 border border-violet-400/40 rounded-full px-3 py-1">
+                <Text className="text-violet-200 text-xs font-extrabold">{level.level}</Text>
+              </View>
+              <Text className="text-gray-400 text-[11px] mt-1.5">{formatKg(level.ratio) + '× tu peso corporal'}</Text>
+            </View>
+          ) : null}
+        </View>
+        {level?.next ? (
+          <Text className="text-gray-400 text-xs mt-3">
+            {'Para nivel ' + level.next.level + ' necesitas un 1RM de ' + formatKg(level.next.kg) + ' kg (te faltan ' + formatKg(Math.max(0, level.next.kg - bestOneRm)) + ' kg).'}
+          </Text>
+        ) : null}
       </View>
 
       <View className="bg-surface border border-border rounded-3xl p-5">
