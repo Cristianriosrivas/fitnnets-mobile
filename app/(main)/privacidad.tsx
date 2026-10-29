@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react'
-import { View, Text, ScrollView, Pressable, TextInput, Alert, ActivityIndicator, Linking } from 'react-native'
+import { View, Text, ScrollView, Pressable, TextInput, Alert, ActivityIndicator, Linking, Switch } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
-import { ArrowLeft, ShieldCheck, FileText, Mail, LogOut, Trash2, ChevronRight } from 'lucide-react-native'
+import { ArrowLeft, ShieldCheck, FileText, Mail, LogOut, Trash2, ChevronRight, PersonStanding } from 'lucide-react-native'
 import { supabase } from '../../core/supabase/client'
 import { CONSENT_VERSION, CONTACT_EMAIL, PRIVACY_URL, TERMS_URL } from '../../core/legal'
 import FadeIn from '../../components/ui/FadeIn'
@@ -41,6 +41,9 @@ export default function PrivacidadScreen() {
   const [accountEmail, setAccountEmail] = useState('')
   const [consent, setConsent] = useState<ConsentRecord | null>(null)
 
+  const [shareMap, setShareMap] = useState<boolean | null>(null)
+  const [savingShare, setSavingShare] = useState(false)
+
   const [confirmText, setConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -63,8 +66,25 @@ export default function PrivacidadScreen() {
 
     if (error) setLoadError('No pudimos cargar tu autorización.')
     else setConsent(data)
+
+    // share_muscle_map existe desde la migración del mapa muscular; si falta, el interruptor se oculta
+    const share = await supabase.from('profiles').select('share_muscle_map').eq('id', user.id).single()
+    setShareMap(share.error ? null : !!(share.data as { share_muscle_map?: boolean }).share_muscle_map)
     setLoading(false)
   }, [])
+
+  const toggleShareMap = async (value: boolean) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    setShareMap(value)
+    setSavingShare(true)
+    const { error } = await supabase.from('profiles').update({ share_muscle_map: value }).eq('id', user.id)
+    setSavingShare(false)
+    if (error) {
+      setShareMap(!value)
+      Alert.alert('No se pudo guardar', 'Revisa tu conexión e intenta de nuevo.')
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -200,6 +220,31 @@ export default function PrivacidadScreen() {
           onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}`)}
         />
       </View>
+
+      {/* Compartir el mapa muscular (opt-in) */}
+      {shareMap !== null ? (
+        <View className="bg-surface border border-border rounded-3xl p-4 mb-4">
+          <View className="flex-row items-center gap-3">
+            <IconBadge colors={gradients.violet} size={36} radius={12}>
+              <PersonStanding color="#ffffff" size={18} />
+            </IconBadge>
+            <View className="flex-1">
+              <Text className="text-white font-semibold text-sm">Compartir mi mapa muscular</Text>
+              <Text className="text-gray-500 text-xs mt-0.5 leading-4">
+                Tus amigos podrán compararse con tu mapa (series y pesos por ejercicio). Nunca se comparten tus medidas corporales.
+              </Text>
+            </View>
+            <Switch
+              value={shareMap}
+              onValueChange={toggleShareMap}
+              disabled={savingShare}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="#ffffff"
+              accessibilityLabel="Compartir mi mapa muscular con mis amigos"
+            />
+          </View>
+        </View>
+      ) : null}
 
       {/* Sesion */}
       <Pressable

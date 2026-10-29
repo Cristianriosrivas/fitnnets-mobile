@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { View, Text, ScrollView, RefreshControl, Animated } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import Svg, { Circle } from 'react-native-svg'
-import { Weight, Ruler, Dumbbell, Flame, Play, Droplet, Trophy, ChevronRight, Plus } from 'lucide-react-native'
+import { Weight, Ruler, Dumbbell, Flame, Play, Droplet, Trophy, ChevronRight, Plus, PersonStanding } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
 import Aurora from '../../../components/ui/Aurora'
 import FadeIn from '../../../components/ui/FadeIn'
@@ -391,6 +391,23 @@ export default function DashboardScreen() {
               <Text className="text-gray-400 text-xs mt-0.5">Mira lo que has desbloqueado y lo que te falta</Text>
             </View>
             <ChevronRight color={colors.muted} size={18} />
+          </View>
+        </PressableScale>
+      </FadeIn>
+
+      {/* Mapa muscular */}
+      <FadeIn delay={525}>
+        <PressableScale onPress={() => router.push('/(main)/cuerpo')} accessibilityLabel="Abrir mi mapa muscular">
+          <View className="rounded-3xl overflow-hidden p-4 mb-4 flex-row items-center gap-3" style={{ borderWidth: 1, borderColor: 'rgba(167,139,250,0.35)' }}>
+            <GradientFill colors={['#1e1b4b', '#141b19']} direction="horizontal" />
+            <IconBadge colors={gradients.violet} size={42} radius={14}>
+              <PersonStanding color="#ffffff" size={20} />
+            </IconBadge>
+            <View className="flex-1">
+              <Text className="text-white font-bold text-sm">Tu mapa muscular 3D</Text>
+              <Text className="text-gray-400 text-xs mt-0.5">Mira qué músculos dominas y compárate con tus amigos</Text>
+            </View>
+            <ChevronRight color={colors.violet} size={18} />
           </View>
         </PressableScale>
       </FadeIn>

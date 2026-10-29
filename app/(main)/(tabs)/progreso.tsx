@@ -2,11 +2,11 @@ import { useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, Pressable, TextInput, RefreshControl, Dimensions, ActivityIndicator,
 } from 'react-native'
-import { useFocusEffect } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import { LineChart } from 'react-native-chart-kit'
 import {
   Weight, Percent, Dumbbell, TrendingUp, TrendingDown, ArrowUp,
-  Flame, Clock, Activity, Plus, Target, Check,
+  Flame, Clock, Activity, Plus, Target, Check, PersonStanding, ChevronRight,
 } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
 import AnimatedRing from '../../../components/ui/AnimatedRing'
@@ -16,6 +16,8 @@ import FadeIn from '../../../components/ui/FadeIn'
 import { GlowOrb } from '../../../components/ui/Aurora'
 import IconBadge from '../../../components/ui/IconBadge'
 import Skeleton from '../../../components/ui/Skeleton'
+import PressableScale from '../../../components/ui/PressableScale'
+import GradientFill from '../../../components/ui/GradientFill'
 import { colors, gradients } from '../../../components/ui/theme'
 import { checkNewBadges } from '../../../core/appChecks'
 import { loadStrengthSeries, StrengthSeries } from '../../../core/training'
@@ -30,6 +32,7 @@ const GOAL_OPTIONS = [
 ]
 
 export default function ProgresoScreen() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState('Progreso')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -238,6 +241,21 @@ export default function ProgresoScreen() {
           <Text className="text-black font-semibold text-sm">Registrar peso de hoy</Text>
         </Pressable>
       )}
+
+      {/* Mapa muscular 3D */}
+      <PressableScale onPress={() => router.push('/(main)/cuerpo')} accessibilityLabel="Abrir mi mapa muscular" style={{ marginBottom: 16 }}>
+        <View className="rounded-3xl overflow-hidden p-4 flex-row items-center gap-4" style={{ borderWidth: 1, borderColor: 'rgba(167,139,250,0.35)' }}>
+          <GradientFill colors={['#1e1b4b', '#141b19']} direction="horizontal" />
+          <IconBadge colors={gradients.violet} size={46} radius={15}>
+            <PersonStanding color="#ffffff" size={22} />
+          </IconBadge>
+          <View className="flex-1">
+            <Text className="text-white font-extrabold text-base">Tu mapa muscular 3D</Text>
+            <Text className="text-gray-400 text-xs mt-0.5">Qué entrenas más, dónde progresas y tu rango por músculo</Text>
+          </View>
+          <ChevronRight color={colors.violet} size={18} />
+        </View>
+      </PressableScale>
 
       {/* Pestañas */}
       <View className="flex-row gap-2 mb-5">

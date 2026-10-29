@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, ScrollView, Pressable, TextInput, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Search, UserPlus, Check, X, Users, Trophy, PlusCircle } from 'lucide-react-native'
+import { Search, UserPlus, Check, X, Users, Trophy, PlusCircle, Swords } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
 import FadeIn from '../../../components/ui/FadeIn'
 import PressableScale from '../../../components/ui/PressableScale'
@@ -199,23 +199,39 @@ export default function SocialScreen() {
         </View>
       ) : (
         friends.map((f) => (
-          <View key={f.id} className="bg-surface border border-border rounded-xl p-3 flex-row items-center mb-2">
-            <View className="w-9 h-9 rounded-full bg-green-500/15 items-center justify-center mr-3">
+          <View key={f.id} className="bg-surface border border-border rounded-2xl p-3 flex-row items-center mb-2 gap-2">
+            <View className="w-10 h-10 rounded-full bg-green-500/15 items-center justify-center mr-1">
               <Text className="text-primary text-sm font-bold">{initials(f.profile?.username)}</Text>
             </View>
-            <Text className="text-white text-sm flex-1">{f.profile?.username}</Text>
-            <Pressable
+            <Text className="text-white text-sm font-semibold flex-1" numberOfLines={1}>{f.profile?.username}</Text>
+            <PressableScale
+              onPress={() =>
+                router.push({
+                  pathname: '/(main)/cuerpo',
+                  params: { friendId: f.profile?.id, friendName: f.profile?.username },
+                })
+              }
+              accessibilityLabel={'Comparar mi cuerpo con ' + f.profile?.username}
+            >
+              <View className="bg-violet-500/15 border border-violet-400/30 rounded-xl px-2.5 py-2 flex-row items-center gap-1.5">
+                <Swords color={colors.violet} size={14} />
+                <Text className="text-violet-300 text-xs font-semibold">Comparar</Text>
+              </View>
+            </PressableScale>
+            <PressableScale
               onPress={() =>
                 router.push({
                   pathname: '/(main)/rutinas-nueva',
                   params: { friendId: f.profile?.id, friendName: f.profile?.username },
                 })
               }
-              className="bg-surface2 border border-border rounded-lg px-2.5 py-1.5 flex-row items-center gap-1.5"
+              accessibilityLabel={'Crear rutina para ' + f.profile?.username}
             >
-              <PlusCircle color="#22c55e" size={14} />
-              <Text className="text-primary text-xs font-medium">Crear rutina</Text>
-            </Pressable>
+              <View className="bg-surface2 border border-border rounded-xl px-2.5 py-2 flex-row items-center gap-1.5">
+                <PlusCircle color={colors.primary} size={14} />
+                <Text className="text-primary text-xs font-semibold">Rutina</Text>
+              </View>
+            </PressableScale>
           </View>
         ))
       )}

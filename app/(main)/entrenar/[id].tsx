@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, Pressable, Image, ScrollView, Animated, Easing, TextInput, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, Pressable, Image, ScrollView, Animated, Easing, TextInput, KeyboardAvoidingView, Platform, useWindowDimensions } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import {
   X, SkipForward, ArrowLeft, Play, Check, Dumbbell, Repeat, Layers, Timer, Minus, Plus, TrendingUp,
@@ -12,6 +12,9 @@ import {
   buildWorkoutReport, formatDuration, isBodyweight, loadWeightHistory, parseWeight, recommendWeight,
   saveExerciseLog, weightStepFor,
 } from '../../../core/training'
+import { REGION_LABEL, Region, heatColor, sessionHeat } from '../../../core/muscles'
+import Body3D from '../../../components/body/Body3D'
+import { BodyVariant, variantForGender } from '../../../components/body/BodyMap'
 import FadeIn from '../../../components/ui/FadeIn'
 import PressableScale from '../../../components/ui/PressableScale'
 import GradientButton from '../../../components/ui/GradientButton'
@@ -189,10 +192,24 @@ function StatTile({ icon, colors: gradient, label, children }: { icon: React.Rea
   )
 }
 
-// Resumen final: rango, estadísticas, para qué sirvió y detalle por ejercicio
-function WorkoutSummary({ report, results, onClose }: { report: WorkoutReport; results: ExerciseResult[]; onClose: () => void }) {
+// Resumen final: rango, estadísticas, mapa de calor, para qué sirvió y detalle por ejercicio
+function WorkoutSummary({
+  report, results, variant, onClose, onOpenBody,
+}: {
+  report: WorkoutReport
+  results: ExerciseResult[]
+  variant: BodyVariant
+  onClose: () => void
+  onOpenBody: () => void
+}) {
   const tier = TIER_STYLE[report.tier]
   const TierIcon = tier.icon
+  const { width: screenWidth } = useWindowDimensions()
+  const heat = sessionHeat(results.map((r) => ({ name: r.exercise.name, muscleGroup: r.exercise.muscleGroup, sets: r.sets })))
+  const hottest = (Object.entries(heat) as [Region, number][])
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
   return (
     <View className="flex-1 bg-background">
       <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 64, paddingBottom: 40 }}>
@@ -267,8 +284,34 @@ function WorkoutSummary({ report, results, onClose }: { report: WorkoutReport; r
           </View>
         </FadeIn>
 
+        {/* Mapa de calor de la sesion */}
+        <FadeIn delay={300}>
+          <View className="bg-surface border border-border rounded-3xl p-5 mb-4 items-center">
+            <View className="flex-row items-center gap-2 self-start mb-1">
+              <Flame color={colors.orange} size={18} />
+              <Text className="text-white font-bold text-base">Zonas trabajadas hoy</Text>
+            </View>
+            <Text className="text-gray-500 text-xs self-start mb-4">Arrastra el cuerpo de lado para ver la espalda</Text>
+            <Body3D variant={variant} values={heat} width={Math.min(200, screenWidth * 0.5)} glowColor={colors.orange} />
+            <View className="flex-row flex-wrap justify-center gap-2 mt-4">
+              {hottest.map(([region, value]) => (
+                <View key={region} className="flex-row items-center gap-1.5 bg-surface2 rounded-full px-3 py-1.5">
+                  <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: heatColor(value) }} />
+                  <Text className="text-white text-xs font-semibold">{REGION_LABEL[region]}</Text>
+                </View>
+              ))}
+            </View>
+            <PressableScale onPress={onOpenBody} accessibilityLabel="Ver la evolución de mi cuerpo" style={{ marginTop: 14 }}>
+              <View className="flex-row items-center gap-1.5 px-4 py-2 rounded-full border border-green-500/40">
+                <TrendingUp color={colors.primary} size={14} />
+                <Text className="text-primary text-xs font-bold">Ver la evolución de mi cuerpo</Text>
+              </View>
+            </PressableScale>
+          </View>
+        </FadeIn>
+
         {/* Para que sirvio */}
-        <FadeIn delay={320}>
+        <FadeIn delay={340}>
           <View className="bg-surface border border-border rounded-3xl p-5 mb-4">
             <View className="flex-row items-center gap-2 mb-2">
               <Target color={colors.primary} size={18} />
@@ -561,7 +604,15 @@ export default function EntrenarScreen() {
         </View>
       )
     }
-    return <WorkoutSummary report={report} results={results} onClose={() => router.back()} />
+    return (
+      <WorkoutSummary
+        report={report}
+        results={results}
+        variant={variantForGender(profile.gender)}
+        onClose={() => router.back()}
+        onOpenBody={() => router.replace('/(main)/cuerpo')}
+      />
+    )
   }
 
   const totalSeconds = Math.round((now - sessionStart.current) / 1000)
