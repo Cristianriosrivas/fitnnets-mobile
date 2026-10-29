@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, ScrollView, Pressable, TextInput, RefreshControl, Dimensions, ActivityIndicator,
 } from 'react-native'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { LineChart } from 'react-native-chart-kit'
 import {
   Weight, Percent, Dumbbell, TrendingUp, TrendingDown, ArrowUp,
@@ -22,9 +22,10 @@ import { colors, gradients } from '../../../components/ui/theme'
 import { checkNewBadges } from '../../../core/appChecks'
 import { loadStrengthSeries, StrengthSeries } from '../../../core/training'
 import { formatKg, strengthLevel } from '../../../core/gym'
+import CardioSection from '../../../components/run/CardioSection'
 
 const screenWidth = Dimensions.get('window').width
-const TABS = ['Progreso', 'Métricas', 'Metas']
+const TABS = ['Progreso', 'Métricas', 'Cardio', 'Metas']
 const GOAL_OPTIONS = [
   { value: 'perder_grasa', label: '🔥 Perder grasa' },
   { value: 'ganar_musculo', label: '💪 Ganar músculo' },
@@ -35,6 +36,15 @@ const GOAL_OPTIONS = [
 export default function ProgresoScreen() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('Progreso')
+  const params = useLocalSearchParams<{ tab?: string }>()
+
+  // Abrir una pestaña concreta desde otra pantalla (p. ej. la tarjeta de pasos del Inicio)
+  useEffect(() => {
+    if (params.tab && TABS.includes(params.tab)) {
+      setActiveTab(params.tab)
+      router.setParams({ tab: undefined })
+    }
+  }, [params.tab, router])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -259,7 +269,7 @@ export default function ProgresoScreen() {
       </PressableScale>
 
       {/* Pestañas */}
-      <View className="flex-row gap-2 mb-5">
+      <View className="flex-row flex-wrap gap-2 mb-5">
         {TABS.map((tab) => (
           <Pressable
             key={tab}
@@ -449,6 +459,9 @@ export default function ProgresoScreen() {
 
       {/* ===== Pestaña Métricas ===== */}
       {activeTab === 'Métricas' && <StrengthSection />}
+
+      {/* ===== Pestaña Cardio ===== */}
+      {activeTab === 'Cardio' && <CardioSection />}
 
       {/* ===== Pestaña Metas ===== */}
       {activeTab === 'Metas' && (

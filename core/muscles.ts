@@ -51,6 +51,8 @@ const EXERCISE_REGIONS: [string, Weights][] = [
   ['plancha', { abs: 1, obliques: 0.6, shoulders: 0.2 }],
   ['mountain climbers', { abs: 1, obliques: 0.5, shoulders: 0.4, quads: 0.3 }],
   ['burpees', { quads: 0.7, chest: 0.6, shoulders: 0.5, abs: 0.5, glutes: 0.5, calves: 0.3 }],
+  ['carrera', { quads: 1, calves: 1, hamstrings: 0.6, glutes: 0.6, abs: 0.2 }],
+  ['caminata', { calves: 1, quads: 0.6, glutes: 0.5, hamstrings: 0.4 }],
 ]
 
 // Si el ejercicio no está en la lista (catálogo nuevo), se usa su grupo muscular
@@ -71,6 +73,15 @@ export function regionsFor(name: string, muscleGroup: string | null): Weights {
   const key = normalize(name)
   const match = EXERCISE_REGIONS.find(([k]) => key.includes(k))
   return match ? match[1] : GROUP_REGIONS[muscleGroup || ''] || GROUP_REGIONS.cuerpo_completo
+}
+
+// Las salidas de la tabla runs cuentan como trabajo de piernas: 1 km corriendo ≈ 1 serie y
+// 1 km caminando ≈ 0,4 (máximo 12 por salida), para que sumen sin inflar el volumen.
+export const RUN_EXERCISE_NAME: Record<string, string> = { correr: 'Carrera', caminar: 'Caminata' }
+
+export function runAsSets(activity: string, meters: number) {
+  const perKm = activity === 'caminar' ? 0.4 : 1
+  return Math.min(12, Math.round((meters / 1000) * perKm * 10) / 10)
 }
 
 // ---------- Colores ----------
@@ -240,7 +251,8 @@ export function regionValues(profile: MuscleProfile, mode: MapMode): Record<Regi
 // ---------- Carga de datos ----------
 
 // Tu propio historial, agregado por ejercicio en el teléfono
-export async function loadOwnExerciseStats(userId: string): Promise<ExerciseStat[]> {
+// includeRuns = false en la comparación con un amigo: su mapa (get_muscle_stats) solo trae gimnasio
+export async function loadOwnExerciseStats(userId: string, includeRuns = true): Promise<ExerciseStat[]> {
   const { data, error } = await supabase
     .from('progress_logs')
     .select('exercise_id, sets_completed, weight_used_kg, date, exercises(name, muscle_group)')
@@ -278,7 +290,36 @@ export async function loadOwnExerciseStats(userId: string): Promise<ExerciseStat
     }
     map.set(id, stat)
   }
-  return Array.from(map.values()).map(({ days, ...s }) => ({ ...s, sessions: days.size }))
+  const gym = Array.from(map.values()).map(({ days, ...s }) => ({ ...s, sessions: days.size }))
+  return includeRuns ? [...gym, ...(await loadRunStats(userId, since))] : gym
+}
+
+// Una estadística por actividad (Carrera, Caminata). Si la consulta falla, el mapa sigue con el gimnasio.
+async function loadRunStats(userId: string, since: string): Promise<ExerciseStat[]> {
+  const { data, error } = await supabase.from('runs').select('activity, distance_m, started_at').eq('user_id', userId).limit(1000)
+  if (error || !data) return []
+  const byActivity = new Map<string, ExerciseStat & { days: Set<string> }>()
+  for (const r of data as { activity: string; distance_m: number; started_at: string }[]) {
+    const stat = byActivity.get(r.activity) || {
+      exerciseId: 'run-' + r.activity,
+      name: RUN_EXERCISE_NAME[r.activity] || 'Carrera',
+      muscleGroup: 'piernas',
+      setsTotal: 0,
+      setsRecent: 0,
+      sessions: 0,
+      firstWeight: null,
+      lastWeight: null,
+      maxWeight: null,
+      days: new Set<string>(),
+    }
+    const sets = runAsSets(r.activity, Number(r.distance_m))
+    const day = r.started_at.slice(0, 10)
+    stat.setsTotal += sets
+    if (day >= since) stat.setsRecent += sets
+    stat.days.add(day)
+    byActivity.set(r.activity, stat)
+  }
+  return Array.from(byActivity.values()).map(({ days, ...s }) => ({ ...s, sessions: days.size }))
 }
 
 // Cambios de medidas (primera vs última), solo para tu propio mapa: son datos de salud

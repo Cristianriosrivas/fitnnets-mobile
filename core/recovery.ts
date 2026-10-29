@@ -1,5 +1,5 @@
 import { supabase } from './supabase/client'
-import { ALL_REGIONS, REGION_LABEL, Region, regionsFor } from './muscles'
+import { ALL_REGIONS, REGION_LABEL, RUN_EXERCISE_NAME, Region, regionsFor, runAsSets } from './muscles'
 
 // Recuperación muscular: cuánto se ha recuperado cada músculo según lo que entrenaste y hace
 // cuántas horas, y qué día de tus rutinas te conviene hoy. Modelo simple y explicable:
@@ -23,18 +23,29 @@ type LogRow = { sets: number; at: number; name: string; muscleGroup: string | nu
 
 export async function loadRecentLogs(userId: string): Promise<LogRow[]> {
   const since = new Date(Date.now() - 4 * 86400000).toISOString()
-  const { data, error } = await supabase
-    .from('progress_logs')
-    .select('sets_completed, created_at, exercises(name, muscle_group)')
-    .eq('user_id', userId)
-    .gte('created_at', since)
+  const [{ data, error }, runs] = await Promise.all([
+    supabase
+      .from('progress_logs')
+      .select('sets_completed, created_at, exercises(name, muscle_group)')
+      .eq('user_id', userId)
+      .gte('created_at', since),
+    supabase.from('runs').select('activity, distance_m, started_at, duration_seconds').eq('user_id', userId).gte('started_at', since),
+  ])
   if (error) throw error
-  return ((data || []) as any[]).map((r) => ({
+  const gym = ((data || []) as any[]).map((r) => ({
     sets: Number(r.sets_completed) || 0,
     at: Date.parse(r.created_at),
     name: r.exercises?.name || '',
     muscleGroup: r.exercises?.muscle_group ?? null,
   }))
+  // Las carreras cansan las piernas (si la tabla no responde, se ignoran)
+  const cardio = ((runs.data || []) as any[]).map((r) => ({
+    sets: runAsSets(r.activity, Number(r.distance_m)),
+    at: Date.parse(r.started_at) + (Number(r.duration_seconds) || 0) * 1000,
+    name: RUN_EXERCISE_NAME[r.activity] || 'Carrera',
+    muscleGroup: 'piernas',
+  }))
+  return [...gym, ...cardio]
 }
 
 export function computeRecovery(logs: LogRow[], now = Date.now()): RecoveryMap {

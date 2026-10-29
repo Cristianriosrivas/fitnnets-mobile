@@ -34,7 +34,7 @@ export default function CountUp({ value, decimals = 0, duration = 1000, delay = 
 
   return (
     <Text className={className} style={style}>
-      {prefix + display.toFixed(decimals) + suffix}
+      {prefix + display.toFixed(decimals).replace('.', ',') + suffix}
     </Text>
   )
 }

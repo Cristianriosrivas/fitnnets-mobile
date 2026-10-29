@@ -3,7 +3,7 @@ import { View, Text, Pressable, Animated, Easing, Share, useWindowDimensions } f
 import { useRouter } from 'expo-router'
 import { X, Sparkles, Trophy, Share2, Dumbbell } from 'lucide-react-native'
 import { supabase } from '../../core/supabase/client'
-import { WrappedData, loadWrapped, wrappedShareText } from '../../core/wrapped'
+import { WrappedData, cardioEquivalence, loadWrapped, wrappedShareText } from '../../core/wrapped'
 import Body3D from '../../components/body/Body3D'
 import { BodyVariant, preferredVariant } from '../../components/body/BodyMap'
 import GradientFill from '../../components/ui/GradientFill'
@@ -141,7 +141,7 @@ export default function WrappedScreen() {
             <Big>{data.workouts === 1 ? 'día' : 'días'}</Big>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 24 }}>
               {data.totalMinutes ? <Chip>{'⏱️ ' + data.totalMinutes + ' min'}</Chip> : null}
-              <Chip>{'🏋️ ' + data.totalSets + ' series'}</Chip>
+              {data.totalSets ? <Chip>{'🏋️ ' + data.totalSets + ' series'}</Chip> : null}
               {data.bestStreak > 1 ? <Chip>{'🔥 ' + data.bestStreak + ' días seguidos'}</Chip> : null}
             </View>
           </>
@@ -162,6 +162,28 @@ export default function WrappedScreen() {
             <Big>kilos</Big>
             <Text style={{ fontSize: 86, marginTop: 22 }}>{data.equivalence.emoji}</Text>
             <Sub>{'Es como levantar ' + data.equivalence.amount + ' ' + data.equivalence.thing}</Sub>
+          </>
+        ),
+      })
+    }
+
+    if (data.cardio && data.cardio.km > 0) {
+      list.push({
+        key: 'cardio',
+        colors: ['#4c0519', '#be123c', '#0a0f0d'],
+        glow: colors.orange,
+        content: (
+          <>
+            <Kicker>CARDIO</Kicker>
+            <Sub>Corriendo y caminando recorriste</Sub>
+            <CountUp value={data.cardio.km} decimals={1} duration={1600} style={{ color: '#ffffff', fontSize: 86, fontWeight: '900', lineHeight: 96, marginTop: 6 }} />
+            <Big>kilómetros</Big>
+            <Text style={{ fontSize: 76, marginTop: 18 }}>🏃</Text>
+            <Sub>{cardioEquivalence(data.cardio.km)}</Sub>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 18 }}>
+              <Chip>{data.cardio.outings + (data.cardio.outings === 1 ? ' salida' : ' salidas')}</Chip>
+              {data.cardio.minutes ? <Chip>{'⏱️ ' + data.cardio.minutes + ' min'}</Chip> : null}
+            </View>
           </>
         ),
       })
@@ -250,6 +272,7 @@ export default function WrappedScreen() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 22 }}>
             <Chip>{'🗓️ ' + data.workouts + ' días'}</Chip>
             {data.volumeKg ? <Chip>{'🏋️ ' + data.volumeKg + ' kg'}</Chip> : null}
+            {data.cardio ? <Chip>{'🏃 ' + String(data.cardio.km).replace('.', ',') + ' km'}</Chip> : null}
             {data.topMuscle ? <Chip>{'⭐ ' + data.topMuscle.label}</Chip> : null}
             {data.bestStreak > 1 ? <Chip>{'🔥 ' + data.bestStreak + ' días seguidos'}</Chip> : null}
           </View>

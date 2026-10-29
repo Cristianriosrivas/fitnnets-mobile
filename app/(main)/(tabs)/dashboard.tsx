@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { View, Text, ScrollView, RefreshControl, Animated } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import Svg, { Circle } from 'react-native-svg'
-import { Weight, Ruler, Dumbbell, Flame, Play, Droplet, Trophy, ChevronRight, Plus, PersonStanding, BatteryCharging, Sparkles } from 'lucide-react-native'
+import { Weight, Ruler, Dumbbell, Flame, Play, Droplet, Trophy, ChevronRight, Plus, PersonStanding, BatteryCharging, Sparkles, Zap, Footprints } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
 import Aurora from '../../../components/ui/Aurora'
 import FadeIn from '../../../components/ui/FadeIn'
@@ -17,6 +17,7 @@ import { colors, glow, gradients, GradientColors } from '../../../components/ui/
 import BodyMap, { BodyVariant, preferredVariant } from '../../../components/body/BodyMap'
 import { Region } from '../../../core/muscles'
 import { RecoveryMap, computeRecovery, loadRecentLogs, readiness, recommendDay, recoveryColor, tiredRegions } from '../../../core/recovery'
+import { dailyStepsSupported, loadStepGoal, syncDailySteps } from '../../../core/steps'
 
 const TIPS = [
   'Mantén una buena hidratación. El agua mejora tu rendimiento y recuperación.',
@@ -170,6 +171,8 @@ export default function DashboardScreen() {
   } | null>(null)
   const [recovery, setRecovery] = useState<RecoveryMap | null>(null)
   const [variant, setVariant] = useState<BodyVariant>('male')
+  const [stepsToday, setStepsToday] = useState<number | null>(null)
+  const [stepGoal, setStepGoal] = useState(8000)
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -196,14 +199,15 @@ export default function DashboardScreen() {
       .maybeSingle()
     setBicepCm(metric?.bicep_cm ?? null)
 
-    // Racha de dias consecutivos
-    const { data: logs } = await supabase
-      .from('progress_logs')
-      .select('date')
-      .eq('user_id', user.id)
-      .order('date', { ascending: false })
+    // Racha de dias consecutivos (un dia con carrera tambien cuenta como entrenado)
+    const [{ data: logs }, { data: runDays }] = await Promise.all([
+      supabase.from('progress_logs').select('date').eq('user_id', user.id).order('date', { ascending: false }),
+      supabase.from('runs').select('started_at').eq('user_id', user.id).order('started_at', { ascending: false }).limit(400),
+    ])
 
-    const uniqueDates = Array.from(new Set((logs || []).map((l) => l.date))).sort().reverse()
+    const uniqueDates = Array.from(
+      new Set([...(logs || []).map((l) => l.date as string), ...(runDays || []).map((r) => (r.started_at as string).slice(0, 10))])
+    ).sort().reverse()
     let currentStreak = 0
     let checkDate = new Date()
     for (const dateStr of uniqueDates) {
@@ -239,6 +243,13 @@ export default function DashboardScreen() {
     const recoveryMap = computeRecovery(recentLogs)
     setRecovery(recoveryMap)
     setVariant(variantPref)
+
+    // Pasos del dia: solo el iPhone guarda historial (Android llega con Health Connect en la APK)
+    if (dailyStepsSupported) {
+      const [days, goal] = await Promise.all([syncDailySteps(user.id), loadStepGoal()])
+      setStepsToday(days ? days[days.length - 1].steps : null)
+      setStepGoal(goal)
+    }
 
     const recommended = recommendDay(routines || [], recoveryMap)
     if (recommended) {
@@ -392,6 +403,37 @@ export default function DashboardScreen() {
           <RecoveryCard map={recovery} variant={variant} onPress={() => router.push({ pathname: '/(main)/cuerpo', params: { mode: 'recuperacion' } })} />
         </FadeIn>
       ) : null}
+
+      {/* Correr y pasos del dia */}
+      <FadeIn delay={160}>
+        <View className="flex-row gap-3 mb-4">
+          <PressableScale onPress={() => router.push('/(main)/correr')} style={{ flex: 1 }} accessibilityLabel="Salir a correr">
+            <View className="rounded-3xl overflow-hidden p-4" style={{ minHeight: 132 }}>
+              <GradientFill colors={['#f97316', '#be123c']} radius={24} />
+              <View className="w-10 h-10 rounded-2xl items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+                <Zap color="#ffffff" size={20} fill="#ffffff" />
+              </View>
+              <Text className="text-white font-extrabold text-base mt-3">Salir a correr</Text>
+              <Text className="text-white/80 text-xs mt-0.5">Km, ritmo y pasos con GPS</Text>
+            </View>
+          </PressableScale>
+          {stepsToday !== null ? (
+            <PressableScale
+              onPress={() => router.push({ pathname: '/(main)/(tabs)/progreso', params: { tab: 'Cardio' } })}
+              style={{ flex: 1 }}
+              accessibilityLabel="Ver mis pasos"
+            >
+              <View className="bg-surface border border-border rounded-3xl p-4 items-center" style={{ minHeight: 132 }}>
+                <AnimatedRing progress={Math.min(100, (stepsToday / stepGoal) * 100)} size={64} stroke={7} colors={gradients.ocean} delay={200}>
+                  <Footprints color={colors.sky} size={18} />
+                </AnimatedRing>
+                <CountUp value={stepsToday} className="text-white text-lg font-extrabold mt-2" />
+                <Text className="text-gray-400 text-[11px]">{'de ' + stepGoal.toLocaleString('es-CO') + ' pasos'}</Text>
+              </View>
+            </PressableScale>
+          ) : null}
+        </View>
+      </FadeIn>
 
       {/* Estadisticas en tarjetas 3D */}
       <View className="flex-row flex-wrap justify-between">

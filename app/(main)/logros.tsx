@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import {
   ArrowLeft, Trophy, Footprints, Dumbbell, Medal, CalendarCheck, Flame, Zap, Crown, Scale, Target,
-  Pencil, Sparkles, Utensils, Salad, UserPlus, Users, Swords, Lock,
+  Pencil, Sparkles, Utensils, Salad, UserPlus, Users, Swords, Lock, Route, Timer, Mountain, MapPin,
 } from 'lucide-react-native'
 import type { LucideIcon } from 'lucide-react-native'
 import { supabase } from '../../core/supabase/client'
@@ -21,11 +21,16 @@ const ICONS: Record<BadgeIcon, LucideIcon> = {
   footprints: Footprints, dumbbell: Dumbbell, medal: Medal, calendar: CalendarCheck, flame: Flame, zap: Zap,
   crown: Crown, scale: Scale, target: Target, pencil: Pencil, sparkles: Sparkles, utensils: Utensils,
   salad: Salad, trophy: Trophy, 'user-plus': UserPlus, users: Users, swords: Swords,
+  route: Route, timer: Timer, mountain: Mountain, 'map-pin': MapPin,
 }
+
+// 10000 -> 10.000 (la meta de pasos se lee mejor con separador de miles)
+const fmt = (n: number) => n.toLocaleString('es-CO')
 
 const GROUP_GRADIENTS: Record<BadgeGroup, GradientColors> = {
   Entrenamiento: gradients.brand,
   Constancia: gradients.ember,
+  Cardio: ['#f97316', '#e11d48'],
   Progreso: gradients.ocean,
   Nutrición: gradients.gold,
   Social: gradients.violet,
@@ -34,7 +39,7 @@ const GROUP_GRADIENTS: Record<BadgeGroup, GradientColors> = {
 function BadgeCard({ badge }: { badge: Badge }) {
   const Icon = ICONS[badge.icon]
   const gradient = GROUP_GRADIENTS[badge.group]
-  const label = `${badge.title}. ${badge.description}. ${badge.unlocked ? 'Desbloqueada' : `${badge.progress} de ${badge.goal}`}`
+  const label = `${badge.title}. ${badge.description}. ${badge.unlocked ? 'Desbloqueada' : `${fmt(badge.progress)} de ${fmt(badge.goal)}`}`
 
   if (badge.unlocked) {
     return (
@@ -68,7 +73,7 @@ function BadgeCard({ badge }: { badge: Badge }) {
               <GradientFill colors={gradient} direction="horizontal" />
             </View>
           </View>
-          <Text className="text-gray-500 text-[11px] mt-1">{badge.progress + ' / ' + badge.goal}</Text>
+          <Text className="text-gray-500 text-[11px] mt-1">{fmt(badge.progress) + ' / ' + fmt(badge.goal)}</Text>
         </View>
       </View>
     </TiltCard>
@@ -164,7 +169,7 @@ export default function LogrosScreen() {
                   <View className="bg-surface2 rounded-xl px-3 py-2 mt-3">
                     <Text className="text-gray-500 text-[11px]">Te falta poco</Text>
                     <Text className="text-white text-xs font-semibold mt-0.5" numberOfLines={1}>
-                      {closest.title + ' · ' + closest.progress + '/' + closest.goal}
+                      {closest.title + ' · ' + fmt(closest.progress) + '/' + fmt(closest.goal)}
                     </Text>
                   </View>
                 ) : (

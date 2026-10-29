@@ -204,7 +204,7 @@ export default function CuerpoScreen() {
     if (!user) return
     try {
       const [stats, sizes, savedVariant, recentLogs] = await Promise.all([
-        loadOwnExerciseStats(user.id),
+        loadOwnExerciseStats(user.id, !friendId),
         loadSizeChanges(user.id),
         AsyncStorage.getItem(BODY_VARIANT_KEY).catch(() => null),
         loadRecentLogs(user.id).catch(() => []),
