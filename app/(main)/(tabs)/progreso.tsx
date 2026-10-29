@@ -14,8 +14,11 @@ import CountUp from '../../../components/ui/CountUp'
 import TiltCard from '../../../components/ui/TiltCard'
 import FadeIn from '../../../components/ui/FadeIn'
 import { GlowOrb } from '../../../components/ui/Aurora'
-import { colors } from '../../../components/ui/theme'
+import IconBadge from '../../../components/ui/IconBadge'
+import Skeleton from '../../../components/ui/Skeleton'
+import { colors, gradients } from '../../../components/ui/theme'
 import { checkNewBadges } from '../../../core/appChecks'
+import { loadStrengthSeries, StrengthSeries } from '../../../core/training'
 
 const screenWidth = Dimensions.get('window').width
 const TABS = ['Progreso', 'Métricas', 'Metas']
@@ -426,13 +429,7 @@ export default function ProgresoScreen() {
       )}
 
       {/* ===== Pestaña Métricas ===== */}
-      {activeTab === 'Métricas' && (
-        <View className="bg-surface border border-border rounded-2xl p-8 items-center">
-          <Text className="text-gray-400 text-center">
-            Próximamente: % grasa corporal, masa muscular y más métricas detalladas 🚧
-          </Text>
-        </View>
-      )}
+      {activeTab === 'Métricas' && <StrengthSection />}
 
       {/* ===== Pestaña Metas ===== */}
       {activeTab === 'Metas' && (
@@ -523,5 +520,142 @@ function ProgressRing({ percent, caption }: { percent: number; caption: string }
       <CountUp value={percent} suffix="%" delay={200} className="text-white text-lg font-extrabold" />
       <Text style={{ fontSize: 9, color: colors.soft, textAlign: 'center', lineHeight: 11 }}>{caption}</Text>
     </AnimatedRing>
+  )
+}
+
+// Evolución del peso levantado por ejercicio (datos de progress_logs.weight_used_kg)
+function StrengthSection() {
+  const [series, setSeries] = useState<StrengthSeries[] | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    setError('')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    try {
+      const data = await loadStrengthSeries(user.id)
+      setSeries(data)
+      setSelectedId((current) => current ?? data[0]?.exerciseId ?? null)
+    } catch {
+      setError('No pudimos cargar tu fuerza por ejercicio.')
+      setSeries([])
+    }
+  }, [])
+
+  useFocusEffect(
+    useCallback(() => {
+      load()
+    }, [load])
+  )
+
+  if (series === null) return <Skeleton height={280} radius={24} />
+
+  if (error) {
+    return (
+      <View className="bg-surface border border-border rounded-3xl p-6 items-center">
+        <Text className="text-gray-400 text-center">{error}</Text>
+        <Pressable onPress={load} className="bg-primary rounded-xl px-5 py-2.5 mt-4">
+          <Text className="text-black font-semibold">Reintentar</Text>
+        </Pressable>
+      </View>
+    )
+  }
+
+  if (series.length === 0) {
+    return (
+      <View className="bg-surface border border-border rounded-3xl p-8 items-center">
+        <IconBadge colors={gradients.violet} size={56} radius={18}>
+          <Dumbbell color="#ffffff" size={26} />
+        </IconBadge>
+        <Text className="text-white font-bold text-base mt-4">Tu fuerza, ejercicio por ejercicio</Text>
+        <Text className="text-gray-400 text-sm text-center mt-1">
+          Anota el peso cuando entrenes y aquí verás cómo sube cada ejercicio.
+        </Text>
+      </View>
+    )
+  }
+
+  const selected = series.find((s) => s.exerciseId === selectedId) || series[0]
+  const weights = selected.points.map((p) => p.weight)
+  const best = Math.max(...weights)
+  const gain = Math.round((weights[weights.length - 1] - weights[0]) * 100) / 100
+  const labelStep = Math.max(1, Math.ceil(selected.points.length / 4))
+  const labels = selected.points.map((p, i) =>
+    (selected.points.length - 1 - i) % labelStep === 0
+      ? new Date(p.date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+      : ''
+  )
+
+  return (
+    <View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingBottom: 14 }}>
+        {series.map((s) => {
+          const active = s.exerciseId === selected.exerciseId
+          return (
+            <Pressable
+              key={s.exerciseId}
+              onPress={() => setSelectedId(s.exerciseId)}
+              className={`px-3.5 py-2 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-surface border-border'}`}
+            >
+              <Text className={active ? 'text-black text-xs font-bold' : 'text-gray-300 text-xs'}>{s.name}</Text>
+            </Pressable>
+          )
+        })}
+      </ScrollView>
+
+      <View className="flex-row justify-between mb-3">
+        <View className="bg-surface border border-border rounded-3xl p-4" style={{ width: '48.5%' }}>
+          <Text className="text-gray-400 text-xs">Mejor marca</Text>
+          <View className="flex-row items-end mt-1">
+            <CountUp value={best} decimals={Number.isInteger(best) ? 0 : 1} className="text-white text-2xl font-extrabold" />
+            <Text className="text-gray-400 text-xs mb-1 ml-1">kg</Text>
+          </View>
+        </View>
+        <View className="bg-surface border border-border rounded-3xl p-4" style={{ width: '48.5%' }}>
+          <Text className="text-gray-400 text-xs">Desde tu primera sesión</Text>
+          <Text className={`text-2xl font-extrabold mt-1 ${gain > 0 ? 'text-primary' : 'text-white'}`}>
+            {(gain > 0 ? '+' : '') + gain + ' kg'}
+          </Text>
+        </View>
+      </View>
+
+      <View className="bg-surface border border-border rounded-3xl p-5">
+        <Text className="text-white font-semibold text-sm mb-3">{selected.name}</Text>
+        {selected.points.length < 2 ? (
+          <Text className="text-gray-500 text-sm text-center py-8">
+            Entrena este ejercicio al menos 2 días para ver tu evolución.
+          </Text>
+        ) : (
+          <LineChart
+            data={{ labels, datasets: [{ data: weights }] }}
+            width={screenWidth - 72}
+            height={200}
+            withVerticalLines={false}
+            withOuterLines={false}
+            bezier
+            yAxisSuffix=" kg"
+            chartConfig={{
+              backgroundColor: '#141b19',
+              backgroundGradientFrom: '#141b19',
+              backgroundGradientTo: '#141b19',
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(167, 139, 250, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(107, 120, 118, ${opacity})`,
+              fillShadowGradientFrom: '#a78bfa',
+              fillShadowGradientFromOpacity: 0.35,
+              fillShadowGradientTo: '#a78bfa',
+              fillShadowGradientToOpacity: 0,
+              propsForDots: { r: '3', strokeWidth: '0', fill: '#a78bfa' },
+              propsForBackgroundLines: { stroke: '#1f2926', strokeDasharray: '3 3' },
+            }}
+            style={{ marginLeft: -12, borderRadius: 12 }}
+          />
+        )}
+        <Text className="text-gray-500 text-xs mt-2">
+          {selected.points.length + (selected.points.length === 1 ? ' sesión registrada' : ' sesiones registradas')}
+        </Text>
+      </View>
+    </View>
   )
 }
