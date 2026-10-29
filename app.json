@@ -6,7 +6,19 @@
     "userInterfaceStyle": "automatic",
     "plugins": [
       "expo-router",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Finnets usa tu ubicación solo mientras registras una carrera, para medir distancia y ritmo. La ruta se queda en tu teléfono."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Finnets cuenta tus pasos para mostrarte tu actividad diaria y tu cadencia al correr."
+        }
+      ]
     ]
   }
 }

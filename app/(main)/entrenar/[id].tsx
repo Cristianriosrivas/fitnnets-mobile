@@ -3,7 +3,7 @@ import { View, Text, Pressable, Image, ScrollView, Animated, Easing, TextInput, 
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import {
   X, SkipForward, ArrowLeft, Play, Check, Dumbbell, Repeat, Layers, Timer, Minus, Plus, TrendingUp,
-  Sparkles, PersonStanding, Medal, Gem, Crown, Flame, Weight, Trophy, Target, Clock, Disc3,
+  Sparkles, PersonStanding, Flame, Weight, Trophy, Target, Clock, Disc3,
 } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
 import { checkNewBadges } from '../../../core/appChecks'
@@ -17,6 +17,7 @@ import { estimateOneRepMax, formatKg, platesPerSide, strengthLevel, warmupSets }
 import Body3D from '../../../components/body/Body3D'
 import { BodyVariant, variantForGender } from '../../../components/body/BodyMap'
 import FadeIn from '../../../components/ui/FadeIn'
+import { TIER_STYLE } from '../../../components/ui/tierStyle'
 import PressableScale from '../../../components/ui/PressableScale'
 import GradientButton from '../../../components/ui/GradientButton'
 import GradientFill from '../../../components/ui/GradientFill'
@@ -39,14 +40,6 @@ type FlatExercise = {
 }
 
 const DAY_GRADIENTS = [gradients.brand, gradients.ocean, gradients.violet, gradients.ember, gradients.gold]
-
-const TIER_STYLE: Record<RankTier, { colors: GradientColors; text: string; icon: typeof Medal }> = {
-  Bronce: { colors: ['#f59e0b', '#b45309', '#78350f'], text: '#fff7ed', icon: Medal },
-  Plata: { colors: ['#f3f4f6', '#9ca3af', '#4b5563'], text: '#111827', icon: Medal },
-  Oro: { colors: ['#fde047', '#f59e0b', '#b45309'], text: '#422006', icon: Trophy },
-  Platino: { colors: ['#a5f3fc', '#22d3ee', '#0e7490'], text: '#083344', icon: Gem },
-  Diamante: { colors: ['#c4b5fd', '#818cf8', '#22d3ee'], text: '#1e1b4b', icon: Crown },
-}
 
 const RECOMMENDATION_ICON = { subir: TrendingUp, mantener: Repeat, inicial: Sparkles, corporal: PersonStanding }
 
