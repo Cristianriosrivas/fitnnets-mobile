@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react'
 import { Animated } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import Svg, { ClipPath, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg'
 import maleBody from './bodyPaths.json'
 import femaleBody from './bodyPathsFemale.json'
@@ -23,6 +24,19 @@ type BodyPaths = {
 const BODIES: Record<BodyVariant, BodyPaths> = { male: maleBody as BodyPaths, female: femaleBody as BodyPaths }
 
 export const variantForGender = (gender: string | null | undefined): BodyVariant => (gender === 'femenino' ? 'female' : 'male')
+
+// Modelo elegido a mano en "Tu cuerpo" (se guarda en el teléfono); si no hay, el del género del perfil
+export const BODY_VARIANT_KEY = 'finnets.bodyVariant'
+
+export async function preferredVariant(gender: string | null | undefined): Promise<BodyVariant> {
+  try {
+    const saved = await AsyncStorage.getItem(BODY_VARIANT_KEY)
+    if (saved === 'male' || saved === 'female') return saved
+  } catch {
+    // Sin almacenamiento disponible: se usa el del perfil
+  }
+  return variantForGender(gender)
+}
 
 // Las rutas describen la mitad izquierda; la derecha es su reflejo sobre x = 100
 const MIRROR = 'translate(200, 0) scale(-1, 1)'

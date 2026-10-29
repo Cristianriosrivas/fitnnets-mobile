@@ -2,14 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, ScrollView, Pressable, Animated, useWindowDimensions } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { ArrowLeft, Flame, TrendingUp, Crown, Users, Lock, Ruler, Dumbbell, Swords } from 'lucide-react-native'
+import { ArrowLeft, Users, Lock, Ruler, Dumbbell, Swords, BatteryCharging } from 'lucide-react-native'
 import { supabase } from '../../core/supabase/client'
 import {
   ALL_REGIONS, MapMode, MuscleProfile, Region, RegionTier, TIER_COLOR, TIER_ORDER, buildMuscleProfile,
   compareProfiles, heatColor, loadFriendExerciseStats, loadOwnExerciseStats, loadSizeChanges, regionValues, tierFor,
 } from '../../core/muscles'
 import Body3D from '../../components/body/Body3D'
-import { BodyVariant, variantForGender } from '../../components/body/BodyMap'
+import { BODY_VARIANT_KEY, BodyVariant, variantForGender } from '../../components/body/BodyMap'
+import { RecoveryMap, RegionRecovery, computeRecovery, loadRecentLogs, recoveryColor } from '../../core/recovery'
 import FadeIn from '../../components/ui/FadeIn'
 import PressableScale from '../../components/ui/PressableScale'
 import GradientFill from '../../components/ui/GradientFill'
@@ -19,19 +20,25 @@ import Skeleton from '../../components/ui/Skeleton'
 import { GlowOrb } from '../../components/ui/Aurora'
 import { colors, gradients, GradientColors } from '../../components/ui/theme'
 
-const VARIANT_KEY = 'finnets.bodyVariant'
+// Además de los modos del mapa muscular, tu cuerpo tiene "Recuperación" (solo en tu propio mapa)
+type ViewMode = MapMode | 'recuperacion'
 
-const MODES: { value: MapMode; label: string; icon: typeof Flame }[] = [
-  { value: 'volumen', label: 'Volumen', icon: Flame },
-  { value: 'progreso', label: 'Progreso', icon: TrendingUp },
-  { value: 'rango', label: 'Rango', icon: Crown },
+const MODES: { value: ViewMode; label: string }[] = [
+  { value: 'volumen', label: 'Volumen' },
+  { value: 'progreso', label: 'Progreso' },
+  { value: 'rango', label: 'Rango' },
+  { value: 'recuperacion', label: 'Recuperación' },
 ]
+const FRIEND_MODES = MODES.filter((m) => m.value !== 'recuperacion')
 
-const MODE_HINT: Record<MapMode, string> = {
+const MODE_HINT: Record<ViewMode, string> = {
   volumen: 'Lo que más entrenas (últimos 30 días)',
   progreso: 'Dónde subiste peso o ganaste centímetros',
   rango: 'El nivel de cada músculo, de Bronce a Diamante',
+  recuperacion: 'Verde = listo para entrenar · rojo = necesita descanso',
 }
+
+const RECOVERY_LEGEND: GradientColors = ['#ef4444', '#f59e0b', '#facc15', '#a3e635', '#22c55e']
 
 const HEAT_LEGEND: GradientColors = ['#2a3532', '#14b8a6', '#22c55e', '#a3e635', '#f59e0b', '#ef4444']
 
@@ -46,15 +53,15 @@ function TierChip({ tier, small }: { tier: RegionTier; small?: boolean }) {
 }
 
 // Selector de modo con una píldora que se desliza
-function ModeSwitch({ mode, onChange }: { mode: MapMode; onChange: (m: MapMode) => void }) {
+function ModeSwitch({ modes, mode, onChange }: { modes: { value: ViewMode; label: string }[]; mode: ViewMode; onChange: (m: ViewMode) => void }) {
   const [width, setWidth] = useState(0)
-  const index = MODES.findIndex((m) => m.value === mode)
+  const index = Math.max(0, modes.findIndex((m) => m.value === mode))
   const pos = useRef(new Animated.Value(index)).current
   useEffect(() => {
     Animated.spring(pos, { toValue: index, useNativeDriver: true, speed: 16, bounciness: 8 }).start()
   }, [index, pos])
   // Ancho útil = ancho total menos borde (2) y relleno (8)
-  const segment = (width - 10) / MODES.length
+  const segment = (width - 10) / modes.length
   return (
     <View
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
@@ -65,19 +72,19 @@ function ModeSwitch({ mode, onChange }: { mode: MapMode; onChange: (m: MapMode) 
         <Animated.View
           style={{
             position: 'absolute', top: 3, bottom: 3, left: 3, width: segment, borderRadius: 12, overflow: 'hidden',
-            transform: [{ translateX: pos.interpolate({ inputRange: [0, 1, 2], outputRange: [0, segment, segment * 2] }) }],
+            transform: [{ translateX: pos.interpolate({ inputRange: modes.map((_, i) => i), outputRange: modes.map((_, i) => i * segment) }) }],
           }}
         >
           <GradientFill colors={gradients.brand} direction="horizontal" />
         </Animated.View>
       ) : null}
-      {MODES.map((m) => {
+      {modes.map((m) => {
         const active = m.value === mode
-        const Icon = m.icon
         return (
-          <Pressable key={m.value} onPress={() => onChange(m.value)} className="flex-1 flex-row items-center justify-center gap-1.5" accessibilityRole="tab" accessibilityState={{ selected: active }}>
-            <Icon color={active ? '#04120a' : colors.soft} size={14} />
-            <Text style={{ color: active ? '#04120a' : colors.soft, fontWeight: active ? '800' : '600', fontSize: 13 }}>{m.label}</Text>
+          <Pressable key={m.value} onPress={() => onChange(m.value)} className="flex-1 items-center justify-center" accessibilityRole="tab" accessibilityState={{ selected: active }}>
+            <Text numberOfLines={1} style={{ color: active ? '#04120a' : colors.soft, fontWeight: active ? '800' : '600', fontSize: modes.length > 3 ? 12 : 13 }}>
+              {m.label}
+            </Text>
           </Pressable>
         )
       })}
@@ -85,7 +92,20 @@ function ModeSwitch({ mode, onChange }: { mode: MapMode; onChange: (m: MapMode) 
   )
 }
 
-function Legend({ mode }: { mode: MapMode }) {
+function Legend({ mode }: { mode: ViewMode }) {
+  if (mode === 'recuperacion') {
+    return (
+      <View className="mt-4 px-6">
+        <View className="h-2 rounded-full overflow-hidden">
+          <GradientFill colors={RECOVERY_LEGEND} direction="horizontal" />
+        </View>
+        <View className="flex-row justify-between mt-1">
+          <Text className="text-gray-500 text-[11px]">Cansado</Text>
+          <Text className="text-gray-500 text-[11px]">Recuperado</Text>
+        </View>
+      </View>
+    )
+  }
   if (mode === 'rango') {
     return (
       <View className="flex-row flex-wrap justify-center gap-1.5 mt-4">
@@ -108,7 +128,7 @@ function Legend({ mode }: { mode: MapMode }) {
   )
 }
 
-function RegionDetail({ profile, region }: { profile: MuscleProfile; region: Region }) {
+function RegionDetail({ profile, region, recovery }: { profile: MuscleProfile; region: Region; recovery?: RegionRecovery }) {
   const r = profile.regions[region]
   return (
     <View className="bg-surface border border-border rounded-3xl p-4 mt-5">
@@ -116,6 +136,14 @@ function RegionDetail({ profile, region }: { profile: MuscleProfile; region: Reg
         <Text className="text-white font-extrabold text-lg">{r.label}</Text>
         <TierChip tier={r.tier} />
       </View>
+      {recovery ? (
+        <View className="flex-row items-center gap-2 rounded-xl px-3 py-2.5 mb-2" style={{ backgroundColor: recoveryColor(recovery.recovery) + '1f' }}>
+          <BatteryCharging color={recoveryColor(recovery.recovery)} size={16} />
+          <Text className="text-white text-sm font-semibold flex-1">
+            {Math.round(recovery.recovery * 100) + '% recuperado' + (recovery.hoursToFull ? ' · listo en ' + recovery.hoursToFull + ' h' : ' · listo para entrenar')}
+          </Text>
+        </View>
+      ) : null}
       <View className="flex-row flex-wrap gap-2">
         <View className="bg-surface2 rounded-xl px-3 py-2">
           <Text className="text-gray-500 text-[11px]">Series (30 días)</Text>
@@ -153,13 +181,14 @@ function RegionDetail({ profile, region }: { profile: MuscleProfile; region: Reg
 export default function CuerpoScreen() {
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
-  const params = useLocalSearchParams<{ friendId?: string; friendName?: string }>()
+  const params = useLocalSearchParams<{ friendId?: string; friendName?: string; mode?: string }>()
   const friendId = typeof params.friendId === 'string' ? params.friendId : undefined
   const friendName = typeof params.friendName === 'string' ? params.friendName : 'tu amigo'
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [mode, setMode] = useState<MapMode>('volumen')
+  const [mode, setMode] = useState<ViewMode>(params.mode === 'recuperacion' && !friendId ? 'recuperacion' : 'volumen')
+  const [recoveryMap, setRecoveryMap] = useState<RecoveryMap | null>(null)
   const [selected, setSelected] = useState<Region | null>(null)
   const [variant, setVariant] = useState<BodyVariant>('male')
   const [mine, setMine] = useState<MuscleProfile | null>(null)
@@ -174,13 +203,15 @@ export default function CuerpoScreen() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     try {
-      const [stats, sizes, savedVariant] = await Promise.all([
+      const [stats, sizes, savedVariant, recentLogs] = await Promise.all([
         loadOwnExerciseStats(user.id),
         loadSizeChanges(user.id),
-        AsyncStorage.getItem(VARIANT_KEY).catch(() => null),
+        AsyncStorage.getItem(BODY_VARIANT_KEY).catch(() => null),
+        loadRecentLogs(user.id).catch(() => []),
       ])
       const profile = buildMuscleProfile(stats, sizes)
       setMine(profile)
+      setRecoveryMap(computeRecovery(recentLogs))
       setSelected((current) => current ?? (profile.ranked[0]?.score ? profile.ranked[0].region : 'chest'))
 
       // share_muscle_map existe desde la migración del mapa muscular
@@ -224,10 +255,13 @@ export default function CuerpoScreen() {
 
   const changeVariant = (v: BodyVariant) => {
     setVariant(v)
-    AsyncStorage.setItem(VARIANT_KEY, v).catch(() => undefined)
+    AsyncStorage.setItem(BODY_VARIANT_KEY, v).catch(() => undefined)
   }
 
-  const colorFor = mode === 'rango' ? tierColorFor : undefined
+  // Los modos del mapa muscular; en "Recuperación" los valores salen del mapa de recuperación
+  const mapMode: MapMode = mode === 'recuperacion' ? 'volumen' : mode
+  const colorFor =
+    mode === 'rango' ? tierColorFor : mode === 'recuperacion' ? (_region: Region, value: number) => recoveryColor(value) : undefined
   const glowFor = (profile: MuscleProfile) => (mode === 'rango' ? TIER_COLOR[profile.overallTier] : mode === 'progreso' ? colors.lime : colors.primary)
 
   const header = (
@@ -310,7 +344,7 @@ export default function CuerpoScreen() {
         ) : (
           <>
             <FadeIn delay={60}>
-              <ModeSwitch mode={mode} onChange={setMode} />
+              <ModeSwitch modes={FRIEND_MODES} mode={mode} onChange={setMode} />
               <Text className="text-gray-500 text-xs text-center mt-2">{MODE_HINT[mode]}</Text>
             </FadeIn>
 
@@ -323,7 +357,7 @@ export default function CuerpoScreen() {
                   <View key={side.label} className="items-center" style={{ width: bodyWidth }}>
                     <Body3D
                       variant={side.v}
-                      values={regionValues(side.profile, mode)}
+                      values={regionValues(side.profile, mapMode)}
                       width={bodyWidth}
                       colorFor={colorFor}
                       glowColor={glowFor(side.profile)}
@@ -397,7 +431,10 @@ export default function CuerpoScreen() {
 
   // ----- Tu cuerpo -----
   const bodyWidth = Math.min(250, screenWidth * 0.62)
-  const values = regionValues(mine, mode)
+  const values: Partial<Record<Region, number>> =
+    mode === 'recuperacion' && recoveryMap
+      ? (Object.fromEntries(Object.entries(recoveryMap).map(([region, r]) => [region, r.recovery])) as Record<Region, number>)
+      : regionValues(mine, mapMode)
   const hasData = mine.ranked.some((r) => r.volume > 0)
 
   return (
@@ -420,7 +457,7 @@ export default function CuerpoScreen() {
       </FadeIn>
 
       <FadeIn delay={100}>
-        <ModeSwitch mode={mode} onChange={setMode} />
+        <ModeSwitch modes={MODES} mode={mode} onChange={setMode} />
         <Text className="text-gray-500 text-xs text-center mt-2">{MODE_HINT[mode]}</Text>
       </FadeIn>
 
@@ -455,7 +492,7 @@ export default function CuerpoScreen() {
         </View>
       ) : selected ? (
         <FadeIn key={selected} distance={8}>
-          <RegionDetail profile={mine} region={selected} />
+          <RegionDetail profile={mine} region={selected} recovery={mode === 'recuperacion' ? recoveryMap?.[selected] : undefined} />
         </FadeIn>
       ) : null}
 
@@ -481,7 +518,7 @@ export default function CuerpoScreen() {
                   </View>
                 </View>
                 <View className="h-2 rounded-full bg-surface2 overflow-hidden">
-                  <View style={{ width: `${r.score}%`, height: '100%', borderRadius: 999, backgroundColor: mode === 'rango' ? TIER_COLOR[r.tier] : heatColor(values[r.region]) }} />
+                  <View style={{ width: `${r.score}%`, height: '100%', borderRadius: 999, backgroundColor: mode === 'rango' ? TIER_COLOR[r.tier] : mode === 'recuperacion' && recoveryMap ? recoveryColor(recoveryMap[r.region].recovery) : heatColor(values[r.region] ?? 0) }} />
                 </View>
               </Pressable>
             ))}

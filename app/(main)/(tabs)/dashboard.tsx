@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { View, Text, ScrollView, RefreshControl, Animated } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import Svg, { Circle } from 'react-native-svg'
-import { Weight, Ruler, Dumbbell, Flame, Play, Droplet, Trophy, ChevronRight, Plus, PersonStanding } from 'lucide-react-native'
+import { Weight, Ruler, Dumbbell, Flame, Play, Droplet, Trophy, ChevronRight, Plus, PersonStanding, BatteryCharging } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
 import Aurora from '../../../components/ui/Aurora'
 import FadeIn from '../../../components/ui/FadeIn'
@@ -14,6 +14,9 @@ import AnimatedRing from '../../../components/ui/AnimatedRing'
 import CountUp from '../../../components/ui/CountUp'
 import Skeleton from '../../../components/ui/Skeleton'
 import { colors, glow, gradients, GradientColors } from '../../../components/ui/theme'
+import BodyMap, { BodyVariant, preferredVariant } from '../../../components/body/BodyMap'
+import { Region } from '../../../core/muscles'
+import { RecoveryMap, computeRecovery, loadRecentLogs, readiness, recommendDay, recoveryColor, tiredRegions } from '../../../core/recovery'
 
 const TIPS = [
   'Mantén una buena hidratación. El agua mejora tu rendimiento y recuperación.',
@@ -93,6 +96,43 @@ function WeekBars({ days }: { days: { label: string; trained: boolean }[] }) {
   )
 }
 
+// Cuerpo de frente y espalda pintado por recuperación, con qué músculos conviene descansar
+function RecoveryCard({ map, variant, onPress }: { map: RecoveryMap; variant: BodyVariant; onPress: () => void }) {
+  const score = readiness(map)
+  const tired = tiredRegions(map)
+  const values = Object.fromEntries(Object.entries(map).map(([region, r]) => [region, r.recovery])) as Record<Region, number>
+  const colorFor = (_region: Region, value: number) => recoveryColor(value)
+  const advice = tired.length
+    ? 'Descansa ' + tired.slice(0, 2).map((t) => `${t.label.toLowerCase()} (${Math.round(t.recovery * 100)}%, lista en ${t.hoursToFull} h)`).join(' y ')
+    : 'Todo tu cuerpo está recuperado. ¡A entrenar!'
+  return (
+    <PressableScale onPress={onPress} accessibilityLabel="Ver mi recuperación muscular">
+      <View className="bg-surface border border-border rounded-3xl p-4 mb-4 flex-row items-center gap-3">
+        <View className="flex-row">
+          <BodyMap variant={variant} side="front" values={values} width={50} colorFor={colorFor} pulse={false} />
+          <BodyMap variant={variant} side="back" values={values} width={50} colorFor={colorFor} pulse={false} />
+        </View>
+        <View className="flex-1">
+          <View className="flex-row items-center gap-1.5">
+            <BatteryCharging color={recoveryColor(score / 100)} size={15} />
+            <Text className="text-gray-400 text-xs">Recuperación muscular</Text>
+          </View>
+          <View className="flex-row items-end mt-0.5">
+            <CountUp value={score} suffix="%" className="text-2xl font-extrabold" style={{ color: recoveryColor(score / 100) }} />
+            <Text className="text-gray-400 text-xs mb-1 ml-1.5">
+              {score >= 85 ? 'listo para todo' : score >= 65 ? 'listo para entrenar' : 'mejor un día suave'}
+            </Text>
+          </View>
+          <Text className="text-gray-400 text-xs mt-1 leading-4" numberOfLines={3}>
+            {advice}
+          </Text>
+        </View>
+        <ChevronRight color={colors.muted} size={18} />
+      </View>
+    </PressableScale>
+  )
+}
+
 function DashboardSkeleton() {
   return (
     <View className="flex-1 bg-background" style={{ paddingHorizontal: 16, paddingTop: 64 }}>
@@ -119,7 +159,17 @@ export default function DashboardScreen() {
   const [bicepCm, setBicepCm] = useState<number | null>(null)
   const [streak, setStreak] = useState(0)
   const [last7, setLast7] = useState<{ label: string; trained: boolean }[]>([])
-  const [latestRoutine, setLatestRoutine] = useState<{ id: string; title: string; dayTitle: string; exerciseCount: number } | null>(null)
+  const [latestRoutine, setLatestRoutine] = useState<{
+    id: string
+    title: string
+    dayTitle: string
+    exerciseCount: number
+    dayId?: string
+    readiness?: number
+    focus?: string[]
+  } | null>(null)
+  const [recovery, setRecovery] = useState<RecoveryMap | null>(null)
+  const [variant, setVariant] = useState<BodyVariant>('male')
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -127,7 +177,7 @@ export default function DashboardScreen() {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('username, weight_kg, height_cm')
+      .select('username, weight_kg, height_cm, gender')
       .eq('id', user.id)
       .single()
 
@@ -176,24 +226,35 @@ export default function DashboardScreen() {
     }
     setLast7(week)
 
-    // Rutina mas reciente (para "Tu rutina de hoy")
-    const { data: routine } = await supabase
-      .from('routines')
-      .select('id, title, routine_days(id, day_number, title, routine_exercises(id))')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    // "Tu rutina de hoy": el dia de tus rutinas cuyos musculos estan mas recuperados
+    const [{ data: routines }, recentLogs, variantPref] = await Promise.all([
+      supabase
+        .from('routines')
+        .select('id, title, routine_days(id, day_number, title, routine_exercises(id, sets, exercises(name, muscle_group)))')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false }),
+      loadRecentLogs(user.id).catch(() => []),
+      preferredVariant(profile?.gender),
+    ])
+    const recoveryMap = computeRecovery(recentLogs)
+    setRecovery(recoveryMap)
+    setVariant(variantPref)
 
-    if (routine) {
-      const days = [...(routine.routine_days || [])].sort((a: any, b: any) => a.day_number - b.day_number)
-      const firstDay: any = days[0]
+    const recommended = recommendDay(routines || [], recoveryMap)
+    if (recommended) {
       setLatestRoutine({
-        id: routine.id,
-        title: routine.title,
-        dayTitle: firstDay?.title || routine.title,
-        exerciseCount: firstDay?.routine_exercises?.length || 0,
+        id: recommended.routineId,
+        title: recommended.routineTitle,
+        dayId: recommended.dayId,
+        dayTitle: recommended.dayTitle,
+        exerciseCount: recommended.exerciseCount,
+        readiness: recommended.readiness,
+        focus: recommended.focus,
       })
+    } else if (routines?.[0]) {
+      const routine: any = routines[0]
+      const firstDay: any = [...(routine.routine_days || [])].sort((a: any, b: any) => a.day_number - b.day_number)[0]
+      setLatestRoutine({ id: routine.id, title: routine.title, dayTitle: firstDay?.title || routine.title, exerciseCount: firstDay?.routine_exercises?.length || 0 })
     } else {
       setLatestRoutine(null)
     }
@@ -260,7 +321,11 @@ export default function DashboardScreen() {
           glare
           radius={28}
           maxTilt={7}
-          onPress={() => router.push(latestRoutine ? `/(main)/entrenar/${latestRoutine.id}` : '/(main)/(tabs)/rutinas')}
+          onPress={() =>
+            latestRoutine
+              ? router.push({ pathname: '/(main)/entrenar/[id]', params: { id: latestRoutine.id, ...(latestRoutine.dayId ? { dayId: latestRoutine.dayId } : {}) } })
+              : router.push('/(main)/(tabs)/rutinas')
+          }
           accessibilityLabel={latestRoutine ? 'Iniciar ' + latestRoutine.dayTitle : 'Crear rutina'}
           style={[{ marginBottom: 16 }, glow(colors.primary, 26, 0.35)]}
         >
@@ -292,6 +357,14 @@ export default function DashboardScreen() {
                     {latestRoutine.title}
                   </Text>
                 </View>
+                {latestRoutine.readiness !== undefined ? (
+                  <View className="flex-row items-center gap-1.5 mt-2.5">
+                    <BatteryCharging color="#bbf7d0" size={14} />
+                    <Text className="text-white/90 text-xs font-semibold" numberOfLines={1}>
+                      {'Elegida por tu recuperación: ' + (latestRoutine.focus?.join(' y ') || 'músculos') + ' al ' + latestRoutine.readiness + '%'}
+                    </Text>
+                  </View>
+                ) : null}
                 <View className="flex-row items-center self-start bg-white rounded-full pl-3 pr-4 py-2.5 mt-5 gap-2">
                   <View className="bg-primary rounded-full p-1">
                     <Play color="#04120a" size={12} fill="#04120a" />
@@ -312,6 +385,13 @@ export default function DashboardScreen() {
           </View>
         </TiltCard>
       </FadeIn>
+
+      {/* Recuperacion muscular */}
+      {recovery ? (
+        <FadeIn delay={140}>
+          <RecoveryCard map={recovery} variant={variant} onPress={() => router.push({ pathname: '/(main)/cuerpo', params: { mode: 'recuperacion' } })} />
+        </FadeIn>
+      ) : null}
 
       {/* Estadisticas en tarjetas 3D */}
       <View className="flex-row flex-wrap justify-between">

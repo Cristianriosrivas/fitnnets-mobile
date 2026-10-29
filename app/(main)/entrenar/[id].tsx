@@ -3,16 +3,17 @@ import { View, Text, Pressable, Image, ScrollView, Animated, Easing, TextInput, 
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import {
   X, SkipForward, ArrowLeft, Play, Check, Dumbbell, Repeat, Layers, Timer, Minus, Plus, TrendingUp,
-  Sparkles, PersonStanding, Medal, Gem, Crown, Flame, Weight, Trophy, Target, Clock,
+  Sparkles, PersonStanding, Medal, Gem, Crown, Flame, Weight, Trophy, Target, Clock, Disc3,
 } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
 import { checkNewBadges } from '../../../core/appChecks'
 import {
   ExerciseInfo, ExerciseResult, RankTier, Recommendation, TrainingProfile, WeightHistory, WorkoutReport,
-  buildWorkoutReport, formatDuration, isBodyweight, loadWeightHistory, parseWeight, recommendWeight,
+  averageReps, buildWorkoutReport, formatDuration, isBodyweight, loadWeightHistory, parseWeight, recommendWeight,
   saveExerciseLog, weightStepFor,
 } from '../../../core/training'
 import { REGION_LABEL, Region, heatColor, sessionHeat } from '../../../core/muscles'
+import { estimateOneRepMax, formatKg, platesPerSide, strengthLevel, warmupSets } from '../../../core/gym'
 import Body3D from '../../../components/body/Body3D'
 import { BodyVariant, variantForGender } from '../../../components/body/BodyMap'
 import FadeIn from '../../../components/ui/FadeIn'
@@ -108,15 +109,19 @@ function ClockChip({ seconds, label }: { seconds: number; label?: string }) {
 
 // Peso del ejercicio: -/+ por pasos, teclado numérico (acepta coma o punto) y sugerencia
 function WeightCard({
-  info, value, onChange, recommendation,
+  info, value, onChange, recommendation, firstSet,
 }: {
   info: ExerciseInfo
   value: string
   onChange: (text: string) => void
   recommendation: Recommendation | null
+  firstSet: boolean
 }) {
   const bodyweight = isBodyweight(info)
   const step = weightStepFor(info)
+  const current = parseWeight(value)
+  const plates = info.equipment === 'barra' && current !== null ? platesPerSide(current) : null
+  const warmup = firstSet && current !== null && (info.equipment === 'barra' || info.equipment === 'maquina') ? warmupSets(current, step) : []
   const nudge = (delta: number) => {
     const current = parseWeight(value) ?? 0
     const next = Math.max(0, Math.round((current + delta) * 100) / 100)
@@ -176,9 +181,45 @@ function WeightCard({
           ) : null}
         </View>
       ) : null}
+
+      {/* Calculadora de discos (barra olímpica de 20 kg) */}
+      {plates ? (
+        <View className="flex-row items-center flex-wrap gap-1.5 mt-3">
+          <Disc3 color={colors.soft} size={14} />
+          <Text className="text-gray-400 text-xs mr-1">{plates.length ? 'Por lado:' : 'Solo la barra (20 kg)'}</Text>
+          {plates.map((p, i) => (
+            <View key={i} className="rounded-full px-2 py-0.5" style={{ backgroundColor: PLATE_COLORS[p] || colors.surface2 }}>
+              <Text style={{ color: p >= 5 && p !== 15 ? '#ffffff' : '#0a0f0d', fontSize: 11, fontWeight: '800' }}>{formatKg(p)}</Text>
+            </View>
+          ))}
+        </View>
+      ) : info.equipment === 'mancuernas' && current ? (
+        <Text className="text-gray-500 text-xs mt-3">{formatKg(current) + ' kg en cada mancuerna'}</Text>
+      ) : null}
+
+      {/* Calentamiento antes de la primera serie */}
+      {warmup.length ? (
+        <View className="bg-surface2 rounded-2xl p-3 mt-3">
+          <View className="flex-row items-center gap-1.5 mb-2">
+            <Flame color={colors.orange} size={14} />
+            <Text className="text-white text-xs font-bold">Calentamiento sugerido</Text>
+          </View>
+          <View className="flex-row gap-2">
+            {warmup.map((w, i) => (
+              <View key={i} className="flex-1 bg-background rounded-xl py-2 items-center">
+                <Text className="text-white text-sm font-extrabold">{formatKg(w.weight) + ' kg'}</Text>
+                <Text className="text-gray-500 text-[11px]">{'× ' + w.reps}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
     </View>
   )
 }
+
+// Colores estándar de los discos olímpicos
+const PLATE_COLORS: Record<number, string> = { 25: '#dc2626', 20: '#2563eb', 15: '#facc15', 10: '#16a34a', 5: '#e5e7eb', 2.5: '#475569', 1.25: '#94a3b8' }
 
 function StatTile({ icon, colors: gradient, label, children }: { icon: React.ReactNode; colors: GradientColors; label: string; children: React.ReactNode }) {
   return (
@@ -194,11 +235,12 @@ function StatTile({ icon, colors: gradient, label, children }: { icon: React.Rea
 
 // Resumen final: rango, estadísticas, mapa de calor, para qué sirvió y detalle por ejercicio
 function WorkoutSummary({
-  report, results, variant, onClose, onOpenBody,
+  report, results, variant, profile, onClose, onOpenBody,
 }: {
   report: WorkoutReport
   results: ExerciseResult[]
   variant: BodyVariant
+  profile: TrainingProfile
   onClose: () => void
   onOpenBody: () => void
 }) {
@@ -340,13 +382,20 @@ function WorkoutSummary({
             <Text className="text-white font-bold text-base mb-3">Tu sesión</Text>
             {results.map((r, i) => {
               const record = report.personalRecords.includes(r.exercise.name)
+              const oneRm = r.weightKg ? estimateOneRepMax(r.weightKg, averageReps(r.reps)) : null
+              const level = oneRm ? strengthLevel(r.exercise.name, oneRm, profile.weightKg, profile.gender) : null
               return (
                 <View key={i} className={`flex-row items-center gap-3 py-2.5 ${i < results.length - 1 ? 'border-b border-border' : ''}`}>
                   <View className="flex-1">
                     <Text className="text-white text-sm font-semibold">{r.exercise.name}</Text>
                     <Text className="text-gray-500 text-xs mt-0.5">
-                      {r.sets + ' × ' + r.reps + ' · ' + (r.weightKg ? r.weightKg + ' kg' : isBodyweight(r.exercise) ? 'Peso corporal' : 'Sin peso')}
+                      {r.sets + ' × ' + r.reps + ' · ' + (r.weightKg ? r.weightKg + ' kg' : isBodyweight(r.exercise) ? 'Peso corporal' : 'Sin peso') + (oneRm ? ' · 1RM ~' + formatKg(oneRm) + ' kg' : '')}
                     </Text>
+                    {level ? (
+                      <Text className="text-violet-300 text-[11px] mt-0.5">
+                        {'Nivel ' + level.level + ' · ' + formatKg(level.ratio) + '× tu peso' + (level.next ? ' · ' + level.next.level + ' con 1RM de ' + formatKg(level.next.kg) + ' kg' : '')}
+                      </Text>
+                    ) : null}
                   </View>
                   {record ? (
                     <View className="bg-yellow-500/15 rounded-full px-2 py-0.5">
@@ -370,7 +419,9 @@ function WorkoutSummary({
 }
 
 export default function EntrenarScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, dayId } = useLocalSearchParams<{ id: string; dayId?: string }>()
+  // Si se llega con un día recomendado (desde Inicio), arranca directo en ese día
+  const autoStarted = useRef(false)
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
@@ -419,6 +470,14 @@ export default function EntrenarScreen() {
     }
     load()
   }, [id])
+
+  useEffect(() => {
+    if (autoStarted.current || loading || !dayId) return
+    const day = days.find((d) => d.id === dayId)
+    autoStarted.current = true
+    if (day && day.routine_exercises?.length) startDay(day)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, days, dayId])
 
   // El reloj corre mientras se entrena
   useEffect(() => {
@@ -609,6 +668,7 @@ export default function EntrenarScreen() {
         report={report}
         results={results}
         variant={variantForGender(profile.gender)}
+        profile={profile}
         onClose={() => router.back()}
         onOpenBody={() => router.replace('/(main)/cuerpo')}
       />
@@ -712,6 +772,7 @@ export default function EntrenarScreen() {
             value={weights[currentExercise.id] ?? ''}
             onChange={(text) => setWeights((w) => ({ ...w, [currentExercise.id]: text }))}
             recommendation={recommendation}
+            firstSet={currentSet === 1}
           />
         ) : null}
 

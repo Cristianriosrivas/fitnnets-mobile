@@ -296,7 +296,7 @@ export type WorkoutReport = {
 }
 
 // "10-12" -> 11, "15" -> 15, "30s" o "al fallo" -> 10
-function averageReps(reps: string) {
+export function averageReps(reps: string) {
   const numbers = (reps.match(/\d+/g) || []).map(Number)
   if (numbers.length === 0 || /s\b|seg/i.test(reps)) return 10
   return numbers.reduce((a, b) => a + b, 0) / numbers.length
