@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { View, Text, ScrollView, RefreshControl, Animated } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import Svg, { Circle } from 'react-native-svg'
-import { Weight, Ruler, Dumbbell, Flame, Play, Droplet, Trophy, ChevronRight, Plus, PersonStanding, BatteryCharging } from 'lucide-react-native'
+import { Weight, Ruler, Dumbbell, Flame, Play, Droplet, Trophy, ChevronRight, Plus, PersonStanding, BatteryCharging, Sparkles } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
 import Aurora from '../../../components/ui/Aurora'
 import FadeIn from '../../../components/ui/FadeIn'
@@ -457,6 +457,26 @@ export default function DashboardScreen() {
             <WeekBars days={last7} />
           </View>
         </View>
+      </FadeIn>
+
+      {/* Finnets Wrapped */}
+      <FadeIn delay={460}>
+        <TiltCard glare radius={24} maxTilt={8} onPress={() => router.push('/(main)/wrapped')} accessibilityLabel="Ver mi resumen del mes" style={{ marginBottom: 16 }}>
+          <View style={{ borderRadius: 24, overflow: 'hidden', padding: 18 }} className="flex-row items-center gap-3">
+            <GradientFill colors={['#7e22ce', '#c2410c', '#ca8a04']} radius={24} />
+            <View className="w-12 h-12 rounded-2xl items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
+              <Sparkles color="#ffffff" size={24} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-white/80 text-[11px] font-bold uppercase" style={{ letterSpacing: 2 }}>
+                Finnets Wrapped
+              </Text>
+              <Text className="text-white font-extrabold text-lg">Tu mes en Finnets</Text>
+              <Text className="text-white/80 text-xs">Tus números del mes, listos para compartir</Text>
+            </View>
+            <ChevronRight color="#ffffff" size={20} />
+          </View>
+        </TiltCard>
       </FadeIn>
 
       {/* Logros */}
