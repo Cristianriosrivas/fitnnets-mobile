@@ -1,12 +1,40 @@
 {
   "expo": {
-    "name": "finnets-mobile",
-    "slug": "finnets-mobile",
+    "name": "Finnets",
+    "slug": "finnets",
+    "version": "1.0.0",
     "scheme": "finnets",
-    "userInterfaceStyle": "automatic",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0a0f0d",
+    "android": {
+      "package": "com.cristianrios.finnets",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0f0d"
+      }
+    },
     "plugins": [
       "expo-router",
       "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#0a0f0d"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#22c55e"
+        }
+      ],
       [
         "expo-location",
         {

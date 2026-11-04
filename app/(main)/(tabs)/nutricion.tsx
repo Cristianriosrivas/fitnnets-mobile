@@ -175,9 +175,14 @@ export default function NutricionScreen() {
     if (!editDescription.trim()) return
     setEstimating(true)
     try {
+      // El backend todavía no exige sesión, pero la APK ya la envía para cuando lo haga (DT-12)
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/estimate-calories`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ description: editDescription }),
       })
       const data = await res.json()

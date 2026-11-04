@@ -24,3 +24,11 @@ android/
 ios/
 *.apk
 *.aab
+
+# Llave de firma de la APK: nunca al repositorio (es publico)
+credentials.json
+*.jks
+*.keystore
+
+# APK descargadas
+builds/
