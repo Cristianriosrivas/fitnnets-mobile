@@ -434,7 +434,7 @@ export default function EntrenarScreen() {
   const exerciseStart = useRef(0)
 
   const [profile, setProfile] = useState<TrainingProfile>({ weightKg: null, gender: null, goal: null, activityLevel: null })
-  const [history, setHistory] = useState<WeightHistory>({})
+  const [history, setHistory] = useState<WeightHistory | null>(null)
   const [weights, setWeights] = useState<Record<string, string>>({})
   const [results, setResults] = useState<ExerciseResult[]>([])
   const [report, setReport] = useState<WorkoutReport | null>(null)
@@ -502,12 +502,13 @@ export default function EntrenarScreen() {
     setCurrentSet(1)
     setPhase('exercise')
     setResults([])
+    setHistory(null)
     sessionStart.current = Date.now()
     exerciseStart.current = Date.now()
     setNow(Date.now())
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) setHistory(await loadWeightHistory(user.id, flat.map((f) => f.info.exerciseId)))
+    setHistory(user ? await loadWeightHistory(user.id, flat.map((f) => f.info.exerciseId)).catch(() => ({})) : {})
   }
 
   useEffect(() => {
@@ -522,8 +523,9 @@ export default function EntrenarScreen() {
   }, [phase, secondsLeft])
 
   const currentExercise = queue[currentIndex]
-  const currentHistory = currentExercise ? history[currentExercise.info.exerciseId] || [] : []
-  const recommendation = currentExercise ? recommendWeight(currentExercise.info, currentHistory, profile) : null
+  const currentHistory = (currentExercise && history?.[currentExercise.info.exerciseId]) || []
+  // Sin historial cargado todavía no se sugiere nada: la estimación inicial pisaría la sugerencia real
+  const recommendation = currentExercise && history ? recommendWeight(currentExercise.info, currentHistory, profile) : null
 
   // Al llegar a cada ejercicio, el campo de peso arranca con la sugerencia
   useEffect(() => {
