@@ -12,6 +12,7 @@ import { supabase } from '../../../core/supabase/client'
 import AnimatedRing from '../../../components/ui/AnimatedRing'
 import CountUp from '../../../components/ui/CountUp'
 import FadeIn from '../../../components/ui/FadeIn'
+import { TAB_BAR_SPACE } from '../../../components/ui/AnimatedTabBar'
 import GenerationProgress, { useGeneration } from '../../../components/ui/GenerationProgress'
 import { postAi } from '../../../core/aiRequest'
 import { GlowOrb } from '../../../components/ui/Aurora'
@@ -322,7 +323,7 @@ export default function NutricionScreen() {
     <ScrollView
       className="flex-1 bg-background"
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: 30 }}
+      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: TAB_BAR_SPACE }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22c55e" />}
     >
       <GlowOrb color={colors.lime} size={340} style={{ top: -170, right: -130 }} intensity={0.18} />

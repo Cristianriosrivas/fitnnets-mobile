@@ -2,7 +2,7 @@
   "expo": {
     "name": "Finnets",
     "slug": "finnets",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "scheme": "finnets",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,7 +10,7 @@
     "backgroundColor": "#0a0f0d",
     "android": {
       "package": "com.cristianrios.finnets",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0a0f0d"

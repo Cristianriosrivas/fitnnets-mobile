@@ -1,17 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
-import { Animated, Pressable, View } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { Animated, Pressable, Text, View } from 'react-native'
 import type { BottomTabBarProps, BottomTabNavigationOptions } from 'expo-router/tabs'
 import GradientFill from './GradientFill'
-import { colors } from './theme'
+import { colors, glow, gradients } from './theme'
+
+// Espacio que deben dejar abajo las pestañas: la barra flota sobre el contenido
+export const TAB_BAR_SPACE = 120
 
 function TabButton({ options, focused, onPress }: { options: BottomTabNavigationOptions; focused: boolean; onPress: () => void }) {
-  const active = useRef(new Animated.Value(focused ? 1 : 0)).current
+  const pop = useRef(new Animated.Value(focused ? 1 : 0.8)).current
 
   useEffect(() => {
-    Animated.spring(active, { toValue: focused ? 1 : 0, useNativeDriver: true, speed: 18, bounciness: 10 }).start()
-  }, [focused, active])
+    Animated.spring(pop, { toValue: focused ? 1 : 0.8, useNativeDriver: true, speed: 18, bounciness: 10 }).start()
+  }, [focused, pop])
 
-  const color = focused ? colors.primary : colors.muted
   const title = typeof options.title === 'string' ? options.title : ''
 
   return (
@@ -20,88 +22,38 @@ function TabButton({ options, focused, onPress }: { options: BottomTabNavigation
       accessibilityRole="tab"
       accessibilityState={{ selected: focused }}
       accessibilityLabel={title}
-      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' }}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2 }}
     >
-      <Animated.View
-        style={{
-          alignItems: 'center',
-          transform: [
-            { translateY: active.interpolate({ inputRange: [0, 1], outputRange: [3, -1] }) },
-            { scale: active.interpolate({ inputRange: [0, 1], outputRange: [1, 1.14] }) },
-          ],
-        }}
-      >
-        {options.tabBarIcon?.({ focused, color, size: 21 })}
-      </Animated.View>
-      <Animated.Text
-        style={{
-          color,
-          fontSize: 10,
-          fontWeight: focused ? '700' : '500',
-          marginTop: 3,
-          opacity: active.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }),
-        }}
-      >
-        {title}
-      </Animated.Text>
+      <View style={{ width: 44, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+        {focused ? (
+          <Animated.View style={[{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, borderRadius: 14, transform: [{ scale: pop }] }, glow(colors.primary, 10, 0.45)]}>
+            <View style={{ flex: 1, borderRadius: 14, overflow: 'hidden' }}>
+              <GradientFill colors={gradients.brand} direction="horizontal" radius={14} />
+            </View>
+          </Animated.View>
+        ) : null}
+        <View style={{ zIndex: 1 }}>{options.tabBarIcon?.({ focused, color: focused ? '#04120a' : colors.muted, size: 19 })}</View>
+      </View>
+      <Text style={{ color: focused ? colors.primary : colors.muted, fontSize: 10, fontWeight: '600' }}>{title}</Text>
     </Pressable>
   )
 }
 
-// Barra de pestanas flotante: una pildora con degradado se desliza hacia la pestana activa
+// Barra de pestañas flotante, igual a la de la web en el celular
 export default function AnimatedTabBar({ state, descriptors, navigateToTab, insets }: BottomTabBarProps) {
-  const [width, setWidth] = useState(0)
-  const indicator = useRef(new Animated.Value(state.index)).current
-  const tabWidth = width / state.routes.length
-
-  useEffect(() => {
-    Animated.spring(indicator, { toValue: state.index, useNativeDriver: true, speed: 16, bounciness: 8 }).start()
-  }, [state.index, indicator])
-
   return (
-    <View style={{ backgroundColor: colors.bg, paddingHorizontal: 14, paddingTop: 6, paddingBottom: Math.max(insets.bottom, 12) }}>
+    <View pointerEvents="box-none" style={{ position: 'absolute', left: 12, right: 12, bottom: insets.bottom + 12 }}>
       <View
-        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
         style={{
           flexDirection: 'row',
           height: 64,
+          paddingHorizontal: 6,
           borderRadius: 26,
-          backgroundColor: colors.surface,
+          backgroundColor: 'rgba(20, 27, 25, 0.93)',
           borderWidth: 1,
           borderColor: colors.border,
-          shadowColor: '#000',
-          shadowOpacity: 0.45,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 12,
         }}
       >
-        {width > 0 ? (
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: 6,
-              bottom: 6,
-              left: 0,
-              width: tabWidth,
-              alignItems: 'center',
-              transform: [
-                {
-                  translateX: indicator.interpolate({
-                    inputRange: state.routes.map((_, i) => i),
-                    outputRange: state.routes.map((_, i) => i * tabWidth),
-                  }),
-                },
-              ],
-            }}
-          >
-            <View style={{ flex: 1, width: tabWidth - 10, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(34,197,94,0.25)' }}>
-              <GradientFill colors={['rgba(34,197,94,0.24)', 'rgba(163,230,53,0.08)']} radius={20} direction="vertical" />
-            </View>
-          </Animated.View>
-        ) : null}
-
         {state.routes.map((route, i) => (
           <TabButton
             key={route.key}

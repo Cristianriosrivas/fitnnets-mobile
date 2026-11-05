@@ -16,6 +16,7 @@ import FadeIn from '../../../components/ui/FadeIn'
 import { GlowOrb } from '../../../components/ui/Aurora'
 import IconBadge from '../../../components/ui/IconBadge'
 import Skeleton from '../../../components/ui/Skeleton'
+import { TAB_BAR_SPACE } from '../../../components/ui/AnimatedTabBar'
 import PressableScale from '../../../components/ui/PressableScale'
 import GradientFill from '../../../components/ui/GradientFill'
 import { colors, gradients } from '../../../components/ui/theme'
@@ -231,7 +232,7 @@ export default function ProgresoScreen() {
     <ScrollView
       className="flex-1 bg-background"
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: 30 }}
+      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: TAB_BAR_SPACE }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22c55e" />}
     >
       <GlowOrb color={colors.teal} size={340} style={{ top: -170, left: -120 }} intensity={0.24} />

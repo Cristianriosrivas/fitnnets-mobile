@@ -60,7 +60,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="nutricion"
         options={{
-          title: 'Nutricion',
+          title: 'Nutrición',
           tabBarIcon: ({ color, size }) => <Utensils color={color} size={size} />,
         }}
       />

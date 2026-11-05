@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, TextInput, RefreshControl } from 're
 import { useRouter } from 'expo-router'
 import { Search, UserPlus, Check, X, Users, Trophy, PlusCircle, Swords } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
+import { TAB_BAR_SPACE } from '../../../components/ui/AnimatedTabBar'
 import FadeIn from '../../../components/ui/FadeIn'
 import PressableScale from '../../../components/ui/PressableScale'
 import GradientFill from '../../../components/ui/GradientFill'
@@ -100,7 +101,7 @@ export default function SocialScreen() {
   return (
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: 30 }}
+      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: TAB_BAR_SPACE }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22c55e" />}
     >
       <GlowOrb color={colors.sky} size={340} style={{ top: -170, left: -130 }} intensity={0.22} />

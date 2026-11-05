@@ -13,6 +13,7 @@ import IconBadge from '../../../components/ui/IconBadge'
 import AnimatedRing from '../../../components/ui/AnimatedRing'
 import CountUp from '../../../components/ui/CountUp'
 import Skeleton from '../../../components/ui/Skeleton'
+import { TAB_BAR_SPACE } from '../../../components/ui/AnimatedTabBar'
 import { colors, glow, gradients, GradientColors } from '../../../components/ui/theme'
 import BodyMap, { BodyVariant, preferredVariant } from '../../../components/body/BodyMap'
 import { Region } from '../../../core/muscles'
@@ -295,7 +296,7 @@ export default function DashboardScreen() {
   return (
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: 30 }}
+      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: TAB_BAR_SPACE }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
       <Aurora height={480} style={{ top: -60, left: -16, right: -16 }} />

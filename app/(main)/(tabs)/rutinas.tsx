@@ -1,17 +1,147 @@
-import { useState, useCallback } from 'react'
-import { View, Text, ScrollView, Pressable, RefreshControl, Image, Alert } from 'react-native'
+import { useState, useCallback, useMemo } from 'react'
+import { View, Text, ScrollView, Pressable, RefreshControl, Image, Alert, ActivityIndicator } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
-import { Sparkles, Play, PlusCircle, ChevronDown, Dumbbell, Trash2, Users } from 'lucide-react-native'
+import { Sparkles, PlusCircle, ChevronDown, Dumbbell, Trash2, Repeat, Clock } from 'lucide-react-native'
 import { supabase } from '../../../core/supabase/client'
 import FadeIn from '../../../components/ui/FadeIn'
 import PressableScale from '../../../components/ui/PressableScale'
-import GradientButton from '../../../components/ui/GradientButton'
 import IconBadge from '../../../components/ui/IconBadge'
 import Skeleton from '../../../components/ui/Skeleton'
 import GenerationProgress, { useGeneration } from '../../../components/ui/GenerationProgress'
+import { TAB_BAR_SPACE } from '../../../components/ui/AnimatedTabBar'
 import { postAi } from '../../../core/aiRequest'
 import { GlowOrb } from '../../../components/ui/Aurora'
-import { colors, glow, gradients } from '../../../components/ui/theme'
+import { colors, gradients } from '../../../components/ui/theme'
+
+// Esta pantalla replica la de la web en el celular (src/app/(main)/rutinas/page.tsx del repo fitnnets)
+const FILTER_ACTIVE = '#00c950'
+const ON_PRIMARY = '#052e14'
+const imageUrl = (path: string) => `${process.env.EXPO_PUBLIC_API_URL}${path}`
+
+function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      className="px-4 py-1.5 rounded-full"
+      style={active ? { backgroundColor: FILTER_ACTIVE, borderWidth: 1, borderColor: FILTER_ACTIVE } : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+    >
+      <Text style={{ fontSize: 12, fontWeight: '500', color: active ? ON_PRIMARY : colors.soft }}>{label}</Text>
+    </Pressable>
+  )
+}
+
+function RoutineStat({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <View className="flex-row items-center gap-1">
+      {icon}
+      <Text className="text-xs" style={{ color: colors.soft }}>{label}</Text>
+    </View>
+  )
+}
+
+type RoutineCardProps = {
+  routine: any
+  highlighted: boolean
+  expanded: boolean
+  onToggle: () => void
+  onStart: () => void
+  onDelete: () => void
+}
+
+function RoutineCard({ routine, highlighted, expanded, onToggle, onStart, onDelete }: RoutineCardProps) {
+  const totalExercises = routine.routine_days?.reduce((sum: number, d: any) => sum + (d.routine_exercises?.length || 0), 0)
+  const firstExercise = routine.routine_days?.[0]?.routine_exercises?.[0]
+  const thumbnail = firstExercise?.exercises?.gif_url
+
+  return (
+    <View
+      className="bg-surface rounded-2xl p-4 mb-4"
+      style={{ borderWidth: 1, borderColor: highlighted ? 'rgba(34, 197, 94, 0.5)' : colors.border }}
+    >
+      <View className="w-full rounded-xl overflow-hidden bg-surface2 items-center justify-center mb-4" style={{ height: 128 }}>
+        {thumbnail ? (
+          <Image source={{ uri: imageUrl(thumbnail) }} resizeMode="cover" style={{ width: '100%', height: '100%' }} />
+        ) : (
+          <Dumbbell color={colors.border} size={28} />
+        )}
+      </View>
+
+      <View className="flex-row items-start gap-3">
+        <View className="flex-1">
+          <Text className="text-white font-bold text-base">{routine.title}</Text>
+          <Text className="text-xs capitalize" style={{ color: colors.soft }}>
+            {routine.generated_by_ai ? routine.goal?.replace('_', ' ') : 'Rutina personalizada'}
+          </Text>
+          {routine.created_by ? (
+            <View className="self-start rounded-md px-2 py-0.5 mt-1.5" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)' }}>
+              <Text className="text-[11px] font-medium" style={{ color: '#93c5fd' }}>
+                {'Rutina creada por ' + (routine.creator?.username || 'un amigo')}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <View className="flex-row items-center gap-2">
+          <PressableScale onPress={onStart} accessibilityLabel={'Iniciar ' + routine.title}>
+            <View
+              className="px-3.5 py-2 rounded-lg"
+              style={highlighted ? { backgroundColor: colors.primary } : { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border }}
+            >
+              <Text className="text-xs font-semibold" style={{ color: highlighted ? ON_PRIMARY : '#f5f7f6' }}>Iniciar rutina</Text>
+            </View>
+          </PressableScale>
+          <Pressable onPress={onDelete} accessibilityLabel={'Borrar ' + routine.title} hitSlop={8} className="p-2">
+            <Trash2 color={colors.muted} size={16} />
+          </Pressable>
+        </View>
+      </View>
+
+      <View className="flex-row flex-wrap items-center mt-3" style={{ columnGap: 16, rowGap: 4 }}>
+        <RoutineStat icon={<Dumbbell color={colors.soft} size={13} />} label={(routine.routine_days?.length || 0) + ' días'} />
+        {firstExercise?.sets ? <RoutineStat icon={<Repeat color={colors.soft} size={13} />} label={firstExercise.sets + ' series'} /> : null}
+        {firstExercise?.rest_seconds ? <RoutineStat icon={<Clock color={colors.soft} size={13} />} label={firstExercise.rest_seconds + ' seg descanso'} /> : null}
+      </View>
+
+      <Pressable onPress={onToggle} hitSlop={8} className="flex-row items-center gap-1 mt-3 self-start">
+        <Text className="text-primary text-xs font-medium">
+          {expanded ? 'Ocultar detalles' : `Ver detalles (${totalExercises} ejercicios)`}
+        </Text>
+        <View style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}>
+          <ChevronDown color={colors.primary} size={14} />
+        </View>
+      </Pressable>
+
+      {expanded ? (
+        <View className="mt-4 pt-4 gap-5" style={{ borderTopWidth: 1, borderTopColor: '#1f2926' }}>
+          {[...(routine.routine_days || [])]
+            .sort((a: any, b: any) => a.day_number - b.day_number)
+            .map((day: any) => (
+              <View key={day.id}>
+                <Text className="text-white font-semibold text-sm mb-2.5">{day.title}</Text>
+                <View className="gap-2">
+                  {day.routine_exercises?.map((ex: any) => (
+                    <View key={ex.id} className="flex-row items-center gap-3 rounded-lg p-2" style={{ backgroundColor: colors.surface }}>
+                      {ex.exercises?.gif_url ? (
+                        <Image source={{ uri: imageUrl(ex.exercises.gif_url) }} resizeMode="cover" className="rounded-lg bg-surface2" style={{ width: 44, height: 44 }} />
+                      ) : (
+                        <View className="rounded-lg bg-surface2" style={{ width: 44, height: 44 }} />
+                      )}
+                      <View className="flex-1">
+                        <Text className="text-white text-sm" numberOfLines={1}>{ex.exercises?.name}</Text>
+                        <Text className="text-xs" style={{ color: colors.muted }}>{ex.sets} series x {ex.reps} reps</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
+        </View>
+      ) : null}
+    </View>
+  )
+}
 
 export default function RutinasScreen() {
   const router = useRouter()
@@ -20,6 +150,7 @@ export default function RutinasScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const generation = useGeneration('routine')
   const [error, setError] = useState('')
+  const [filter, setFilter] = useState('todas')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const loadRoutines = useCallback(async () => {
@@ -61,7 +192,7 @@ export default function RutinasScreen() {
     })
 
   const handleDelete = (routineId: string) => {
-    Alert.alert('Borrar rutina', 'Seguro que quieres borrarla? Esta accion no se puede deshacer.', [
+    Alert.alert('Borrar rutina', '¿Seguro que quieres borrarla? Esta acción no se puede deshacer.', [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Borrar',
@@ -85,53 +216,76 @@ export default function RutinasScreen() {
     ])
   }
 
+  const hasFriendRoutines = routines.some((r) => r.created_by)
+
+  const dayFilters = useMemo(() => {
+    const counts = new Set<number>(routines.filter((r) => r.generated_by_ai).map((r) => r.routine_days?.length || 0))
+    return Array.from(counts).filter(Boolean).sort((a, b) => a - b)
+  }, [routines])
+
+  const filteredRoutines = routines.filter((r) => {
+    if (filter === 'todas') return true
+    if (filter === 'personalizada') return !r.generated_by_ai && !r.created_by
+    if (filter === 'amigos') return !!r.created_by
+    return (r.routine_days?.length || 0) === parseInt(filter, 10)
+  })
+
   return (
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: 30 }}
+      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 60, paddingBottom: TAB_BAR_SPACE }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
-      <GlowOrb color={colors.violet} size={340} style={{ top: -170, right: -130 }} intensity={0.22} />
+      <GlowOrb color={colors.primary} size={340} style={{ top: -170, right: -130 }} intensity={0.2} />
 
       <FadeIn>
         <Text className="text-primary text-xs font-bold uppercase" style={{ letterSpacing: 2 }}>
-          Entrena con propósito
+          Entrenamiento
         </Text>
-        <Text className="text-white text-3xl font-extrabold mt-1 mb-5">Tus rutinas</Text>
+        <Text className="text-white text-3xl font-extrabold mt-1 mb-3">Tus Rutinas</Text>
       </FadeIn>
 
       <FadeIn delay={80}>
-        <GradientButton
-          title={generation.active ? 'La IA está creando tu rutina...' : 'Generar rutina con IA'}
-          onPress={handleGenerate}
-          loading={generation.active}
-          icon={<Sparkles color="#04120a" size={17} />}
-        />
-        {generation.active ? (
-          <Text className="text-gray-500 text-xs text-center mt-2 mb-3">No cierres la app mientras se genera.</Text>
-        ) : null}
-        <GenerationProgress generation={generation} />
+        <PressableScale onPress={handleGenerate} disabled={generation.active} accessibilityLabel="Generar rutina con IA">
+          <View className="flex-row items-center justify-center gap-2 rounded-xl py-3 bg-primary" style={{ opacity: generation.active ? 0.5 : 1 }}>
+            {generation.active ? <ActivityIndicator color={ON_PRIMARY} size="small" /> : <Sparkles color={ON_PRIMARY} size={16} />}
+            <Text className="text-sm font-semibold" style={{ color: ON_PRIMARY }}>
+              {generation.active ? 'Generando...' : 'Generar con IA'}
+            </Text>
+          </View>
+        </PressableScale>
 
-        <PressableScale onPress={() => router.push('/(main)/rutinas-nueva')} style={{ marginTop: 12, marginBottom: 20 }}>
-          <View className="bg-surface2 border border-border rounded-2xl items-center flex-row justify-center gap-2" style={{ minHeight: 52 }}>
-            <PlusCircle color={colors.soft} size={17} />
-            <Text className="text-white font-semibold">Crear rutina personalizada</Text>
+        <PressableScale onPress={() => router.push('/(main)/rutinas-nueva')} style={{ marginTop: 8, marginBottom: 24 }}>
+          <View className="flex-row items-center justify-center gap-2 rounded-xl py-3 bg-surface2 border border-border">
+            <PlusCircle color="#f5f7f6" size={16} />
+            <Text className="text-sm" style={{ color: '#f5f7f6' }}>Crear rutina personalizada</Text>
           </View>
         </PressableScale>
       </FadeIn>
 
+      <GenerationProgress generation={generation} />
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 24 }} contentContainerStyle={{ gap: 8 }}>
+        <FilterChip label="Todas" active={filter === 'todas'} onPress={() => setFilter('todas')} />
+        {dayFilters.map((d) => (
+          <FilterChip key={d} label={d + ' Días'} active={filter === String(d)} onPress={() => setFilter(String(d))} />
+        ))}
+        <FilterChip label="Personalizada" active={filter === 'personalizada'} onPress={() => setFilter('personalizada')} />
+        {hasFriendRoutines ? <FilterChip label="De amigos" active={filter === 'amigos'} onPress={() => setFilter('amigos')} /> : null}
+      </ScrollView>
+
       {error ? (
-        <Text className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 p-3 rounded-xl mb-4">{error}</Text>
+        <Text className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 p-3 rounded-lg mb-4">{error}</Text>
       ) : null}
 
       {loading ? (
         <>
-          <Skeleton height={120} radius={24} style={{ marginBottom: 14 }} />
-          <Skeleton height={120} radius={24} style={{ marginBottom: 14 }} />
+          <Skeleton height={280} radius={16} style={{ marginBottom: 16 }} />
+          <Skeleton height={280} radius={16} style={{ marginBottom: 16 }} />
         </>
       ) : routines.length === 0 ? (
         <FadeIn delay={160}>
-          <View className="bg-surface border border-border rounded-3xl p-8 items-center">
+          <View className="bg-surface border border-border rounded-2xl p-8 items-center">
             <IconBadge colors={gradients.violet} size={60} radius={20}>
               <Dumbbell color="#ffffff" size={28} />
             </IconBadge>
@@ -141,114 +295,23 @@ export default function RutinasScreen() {
             </Text>
           </View>
         </FadeIn>
+      ) : filteredRoutines.length === 0 ? (
+        <View className="bg-surface border border-border rounded-2xl items-center" style={{ paddingVertical: 64 }}>
+          <Text style={{ color: colors.soft }}>No hay rutinas en esta categoría.</Text>
+        </View>
       ) : (
-        routines.map((routine, index) => {
-          const isExpanded = expandedId === routine.id
-          const totalExercises = routine.routine_days?.reduce(
-            (sum: number, d: any) => sum + (d.routine_exercises?.length || 0),
-            0
-          )
-          const assigned = !!routine.created_by
-          const badgeColors = assigned ? gradients.ocean : routine.generated_by_ai ? gradients.violet : gradients.brand
-
-          return (
-            <FadeIn key={routine.id} delay={140 + Math.min(index, 6) * 70}>
-              <View className="bg-surface border border-border rounded-3xl p-4 mb-4">
-                <View className="flex-row items-center gap-3">
-                  <IconBadge colors={badgeColors} size={46} radius={15}>
-                    {assigned ? (
-                      <Users color="#04120a" size={20} />
-                    ) : routine.generated_by_ai ? (
-                      <Sparkles color="#ffffff" size={20} />
-                    ) : (
-                      <Dumbbell color="#04120a" size={20} />
-                    )}
-                  </IconBadge>
-                  <View className="flex-1">
-                    <Text className="text-white font-bold text-base" numberOfLines={2}>
-                      {routine.title}
-                    </Text>
-                    <Text className="text-gray-400 text-xs capitalize mt-0.5">
-                      {routine.generated_by_ai ? 'IA · ' + (routine.goal?.replace('_', ' ') || '') : 'Rutina personalizada'}
-                    </Text>
-                  </View>
-                  <PressableScale
-                    onPress={() => router.push(`/(main)/entrenar/${routine.id}`)}
-                    accessibilityLabel={'Iniciar ' + routine.title}
-                  >
-                    <View className="bg-primary rounded-full w-11 h-11 items-center justify-center" style={glow(colors.primary, 12, 0.5)}>
-                      <Play color="#04120a" size={16} fill="#04120a" />
-                    </View>
-                  </PressableScale>
-                </View>
-
-                {assigned ? (
-                  <View className="self-start bg-sky-500/10 border border-sky-500/25 rounded-full px-2.5 py-1 mt-3">
-                    <Text className="text-sky-300 text-[11px] font-semibold">
-                      {'Rutina creada por ' + (routine.creator?.username || 'un amigo')}
-                    </Text>
-                  </View>
-                ) : null}
-
-                <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-border">
-                  <Pressable
-                    onPress={() => setExpandedId(isExpanded ? null : routine.id)}
-                    className="flex-row items-center gap-1 py-1"
-                  >
-                    <Text className="text-primary text-xs font-semibold">
-                      {isExpanded ? 'Ocultar detalles' : `Ver detalles (${totalExercises} ejercicios)`}
-                    </Text>
-                    <View style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }}>
-                      <ChevronDown color={colors.primary} size={14} />
-                    </View>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleDelete(routine.id)}
-                    accessibilityLabel={'Borrar ' + routine.title}
-                    hitSlop={10}
-                    className="p-1.5"
-                  >
-                    <Trash2 color={colors.muted} size={17} />
-                  </Pressable>
-                </View>
-
-                {isExpanded && (
-                  <FadeIn distance={8}>
-                    <View className="mt-3 gap-4">
-                      {routine.routine_days
-                        ?.sort((a: any, b: any) => a.day_number - b.day_number)
-                        .map((day: any) => (
-                          <View key={day.id}>
-                            <Text className="text-white font-semibold text-sm mb-2">{day.title}</Text>
-                            {day.routine_exercises?.map((ex: any) => (
-                              <View key={ex.id} className="flex-row items-center gap-3 bg-surface2 rounded-2xl p-2 mb-2">
-                                {ex.exercises?.gif_url ? (
-                                  <Image
-                                    source={{ uri: `${process.env.EXPO_PUBLIC_API_URL}${ex.exercises.gif_url}` }}
-                                    className="w-12 h-12 rounded-xl bg-border"
-                                  />
-                                ) : (
-                                  <View className="w-12 h-12 rounded-xl bg-border items-center justify-center">
-                                    <Dumbbell color={colors.muted} size={18} />
-                                  </View>
-                                )}
-                                <View className="flex-1">
-                                  <Text className="text-white text-sm font-medium">{ex.exercises?.name}</Text>
-                                  <Text className="text-gray-500 text-xs mt-0.5">
-                                    {ex.sets} series × {ex.reps} reps
-                                  </Text>
-                                </View>
-                              </View>
-                            ))}
-                          </View>
-                        ))}
-                    </View>
-                  </FadeIn>
-                )}
-              </View>
-            </FadeIn>
-          )
-        })
+        filteredRoutines.map((routine, index) => (
+          <FadeIn key={routine.id} delay={140 + Math.min(index, 6) * 70}>
+            <RoutineCard
+              routine={routine}
+              highlighted={index === 0}
+              expanded={expandedId === routine.id}
+              onToggle={() => setExpandedId(expandedId === routine.id ? null : routine.id)}
+              onStart={() => router.push(`/(main)/entrenar/${routine.id}`)}
+              onDelete={() => handleDelete(routine.id)}
+            />
+          </FadeIn>
+        ))
       )}
     </ScrollView>
   )
