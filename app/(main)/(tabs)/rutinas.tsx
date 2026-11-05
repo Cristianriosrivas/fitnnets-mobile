@@ -8,6 +8,8 @@ import PressableScale from '../../../components/ui/PressableScale'
 import GradientButton from '../../../components/ui/GradientButton'
 import IconBadge from '../../../components/ui/IconBadge'
 import Skeleton from '../../../components/ui/Skeleton'
+import GenerationProgress, { useGeneration } from '../../../components/ui/GenerationProgress'
+import { postAi } from '../../../core/aiRequest'
 import { GlowOrb } from '../../../components/ui/Aurora'
 import { colors, glow, gradients } from '../../../components/ui/theme'
 
@@ -16,7 +18,7 @@ export default function RutinasScreen() {
   const [routines, setRoutines] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [generating, setGenerating] = useState(false)
+  const generation = useGeneration('routine')
   const [error, setError] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -43,35 +45,20 @@ export default function RutinasScreen() {
     setRefreshing(false)
   }
 
-  const handleGenerate = async () => {
-    setGenerating(true)
-    setError('')
-
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
-
-    try {
-      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/generate-routine`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+  const handleGenerate = () =>
+    generation.run(async () => {
+      setError('')
+      const { data: { session } } = await supabase.auth.getSession()
+      const result = await postAi(`${process.env.EXPO_PUBLIC_API_URL}/api/generate-routine`, {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
       })
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.error || 'Error al generar la rutina')
-        setGenerating(false)
-        return
+      if (!result.ok) {
+        setError(result.message)
+        return false
       }
-
       await loadRoutines()
-    } catch (e) {
-      setError('No se pudo conectar con el servidor')
-    }
-    setGenerating(false)
-  }
+      return true
+    })
 
   const handleDelete = (routineId: string) => {
     Alert.alert('Borrar rutina', 'Seguro que quieres borrarla? Esta accion no se puede deshacer.', [
@@ -115,14 +102,15 @@ export default function RutinasScreen() {
 
       <FadeIn delay={80}>
         <GradientButton
-          title={generating ? 'La IA está creando tu rutina...' : 'Generar rutina con IA'}
+          title={generation.active ? 'La IA está creando tu rutina...' : 'Generar rutina con IA'}
           onPress={handleGenerate}
-          loading={generating}
+          loading={generation.active}
           icon={<Sparkles color="#04120a" size={17} />}
         />
-        {generating ? (
-          <Text className="text-gray-500 text-xs text-center mt-2">Puede tardar hasta un minuto. No cierres la app.</Text>
+        {generation.active ? (
+          <Text className="text-gray-500 text-xs text-center mt-2 mb-3">No cierres la app mientras se genera.</Text>
         ) : null}
+        <GenerationProgress generation={generation} />
 
         <PressableScale onPress={() => router.push('/(main)/rutinas-nueva')} style={{ marginTop: 12, marginBottom: 20 }}>
           <View className="bg-surface2 border border-border rounded-2xl items-center flex-row justify-center gap-2" style={{ minHeight: 52 }}>

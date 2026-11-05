@@ -12,6 +12,8 @@ import { supabase } from '../../../core/supabase/client'
 import AnimatedRing from '../../../components/ui/AnimatedRing'
 import CountUp from '../../../components/ui/CountUp'
 import FadeIn from '../../../components/ui/FadeIn'
+import GenerationProgress, { useGeneration } from '../../../components/ui/GenerationProgress'
+import { postAi } from '../../../core/aiRequest'
 import { GlowOrb } from '../../../components/ui/Aurora'
 import { colors } from '../../../components/ui/theme'
 
@@ -57,7 +59,7 @@ export default function NutricionScreen() {
   const [loading, setLoading] = useState(true)
   const [planLoading, setPlanLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [generating, setGenerating] = useState(false)
+  const generation = useGeneration('mealplan')
   const [error, setError] = useState('')
   const [plan, setPlan] = useState<any>(null)
   const [username, setUsername] = useState('')
@@ -141,29 +143,21 @@ export default function NutricionScreen() {
     return { Authorization: `Bearer ${session?.access_token}` }
   }
 
-  const handleGenerate = async () => {
-    setGenerating(true)
-    setError('')
-    try {
-      const headers = await getAuthHeader()
-      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/generate-mealplan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
+  const handleGenerate = () =>
+    generation.run(async () => {
+      setError('')
+      const result = await postAi(`${process.env.EXPO_PUBLIC_API_URL}/api/generate-mealplan`, {
+        headers: await getAuthHeader(),
         body: JSON.stringify({ ingredients }),
       })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error || 'Error al generar el plan')
-        setGenerating(false)
-        return
+      if (!result.ok) {
+        setError(result.message)
+        return false
       }
       await loadData()
       setShowIngredientsBox(false)
-    } catch (e) {
-      setError('No se pudo conectar con el servidor')
-    }
-    setGenerating(false)
-  }
+      return true
+    })
 
   const startEditMeal = (meal: any) => {
     setEditingMealId(meal.id)
@@ -390,13 +384,13 @@ export default function NutricionScreen() {
         <View className="gap-3 mb-5">
           <Pressable
             onPress={() => setShowIngredientsBox((v) => !v)}
-            disabled={generating}
+            disabled={generation.active}
             className="bg-primary rounded-xl py-3 flex-row items-center justify-center gap-2"
-            style={{ opacity: generating ? 0.5 : 1 }}
+            style={{ opacity: generation.active ? 0.5 : 1 }}
           >
             <Sparkles color="black" size={16} />
             <Text className="text-black font-semibold text-sm">
-              {generating ? 'Generando...' : plan?.meals?.length ? 'Regenerar con IA' : 'Generar plan con IA'}
+              {generation.active ? 'Generando...' : plan?.meals?.length ? 'Regenerar con IA' : 'Generar plan con IA'}
             </Text>
           </Pressable>
           <Pressable
@@ -408,6 +402,8 @@ export default function NutricionScreen() {
           </Pressable>
         </View>
       )}
+
+      <GenerationProgress generation={generation} />
 
       {/* Ingredientes para la IA */}
       {isToday && showIngredientsBox && (
@@ -425,13 +421,13 @@ export default function NutricionScreen() {
           />
           <Pressable
             onPress={handleGenerate}
-            disabled={generating}
+            disabled={generation.active}
             className="bg-primary rounded-lg py-3 items-center mt-3 flex-row justify-center gap-2"
-            style={{ opacity: generating ? 0.5 : 1 }}
+            style={{ opacity: generation.active ? 0.5 : 1 }}
           >
-            {generating && <ActivityIndicator color="black" size="small" />}
+            {generation.active && <ActivityIndicator color="black" size="small" />}
             <Text className="text-black font-semibold text-sm">
-              {generating ? 'Generando...' : 'Generar mi plan de hoy'}
+              {generation.active ? 'Generando...' : 'Generar mi plan de hoy'}
             </Text>
           </Pressable>
         </View>
