@@ -35,6 +35,8 @@ Para Google Play se usa el perfil `production`, que genera un `.aab`. Sube `andr
 
 ## Instalar la APK en un Android
 
+Descarga directa: https://expo.dev/artifacts/eas/nr6E70ZWexTvjuAxCspGIaTQIJM_sVgvXliH_PsHpJ8.apk
+
 1. Abre el enlace de EAS en el celular o pásale el archivo `.apk`.
 2. Ábrelo y permite "Instalar apps desconocidas" para esa aplicación cuando Android lo pida.
 3. Toca Instalar.
